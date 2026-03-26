@@ -3,82 +3,104 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>On Dark Moon Waters</title>
+    <title>Ponderosa - Chapter One</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="app-shell">
-      <section class="title-panel">
-        <p class="eyebrow">Browser RPG</p>
-        <h1>On Dark Moon Waters</h1>
-        <p class="lead">
-          Guide a lone ferryman through drowned ruins, old vows, and the thing
-          singing beneath the tide.
-        </p>
-      </section>
+      <aside class="side-panel">
+        <section class="brand-card panel-card">
+          <p class="panel-label">Chapter One</p>
+          <h1>Ponderosa</h1>
+          <p class="brand-copy">
+            Evangeline Fontaine wakes to a day claimed at once by the University,
+            the House of Apostles, and the Governor of Ponderosa.
+          </p>
+        </section>
 
-      <section class="game-panel">
-        <div class="status-bar">
-          <div class="status-card">
-            <span class="status-label">Health</span>
-            <strong id="healthStat">0</strong>
-          </div>
-          <div class="status-card">
-            <span class="status-label">Resolve</span>
-            <strong id="resolveStat">0</strong>
-          </div>
-          <div class="status-card">
-            <span class="status-label">Silver</span>
-            <strong id="silverStat">0</strong>
-          </div>
-          <div class="status-card">
-            <span class="status-label">Moonwater</span>
-            <strong id="moonwaterStat">0</strong>
-          </div>
-        </div>
+        <section class="panel-card">
+          <p class="panel-label">Progress</p>
+          <h2 id="chapterLabel" class="panel-heading">Loading...</h2>
+          <p id="sectionLabel" class="panel-copy"></p>
+          <p id="saveState" class="save-state">Checking autosave...</p>
+        </section>
 
-        <article class="story-card">
-          <div class="story-header">
-            <div>
-              <p class="section-label">Current Scene</p>
-              <h2 id="sceneTitle">Loading...</h2>
-            </div>
-            <p id="saveState" class="save-state">Checking autosave...</p>
-          </div>
-          <p id="sceneText" class="scene-text"></p>
-          <ul id="inventoryList" class="inventory-list" aria-label="Inventory"></ul>
-        </article>
+        <section class="panel-card">
+          <p class="panel-label">Attributes</p>
+          <dl id="attributesList" class="stat-list"></dl>
+        </section>
 
-        <section class="choices-panel">
-          <p class="section-label">Choices</p>
+        <section class="panel-card">
+          <p class="panel-label">Allegiances</p>
+          <dl id="allegiancesList" class="stat-list"></dl>
+        </section>
+      </aside>
+
+      <section class="transcript-shell">
+        <header class="transcript-header">
+          <div>
+            <p class="panel-label">Interactive Transcript</p>
+            <h2>System prompts and Eve's replies collect here.</h2>
+          </div>
+          <p class="panel-copy transcript-copy">
+            Choices appear below and the log scrolls upward as the chapter unfolds.
+          </p>
+        </header>
+
+        <div id="transcript" class="transcript" aria-live="polite"></div>
+
+        <section class="choices-shell">
+          <p class="panel-label">Current Choices</p>
           <div id="choicesContainer" class="choices-container"></div>
         </section>
-
-        <section class="controls-panel">
-          <button id="newGameButton" class="control-button secondary">
-            Start Over
-          </button>
-          <button id="saveButton" class="control-button">Download Save</button>
-          <button id="loadButton" class="control-button secondary">
-            Import Save
-          </button>
-          <input id="loadInput" type="file" accept=".txt,.json" hidden />
-        </section>
-
-        <section class="log-panel">
-          <div class="log-header">
-            <p class="section-label">Latest Echoes</p>
-            <span id="endingBadge" class="ending-badge" hidden>Ending Reached</span>
-          </div>
-          <ul id="logList" class="log-list"></ul>
-        </section>
       </section>
+
+      <aside class="side-panel">
+        <section class="panel-card">
+          <p class="panel-label">Companions</p>
+          <ul class="companion-list">
+            <li>
+              <strong>Lady Angelica Dentelle</strong>
+              <span>Matron healer, majordomo, and the one person alive allowed to scold Eve on sight.</span>
+            </li>
+            <li>
+              <strong>Sir Henry Acrillico</strong>
+              <span>Knight of House d'Fontaine, loyal bodyguard, and far too earnest to hide it.</span>
+            </li>
+            <li>
+              <strong>Cobalt and Azzurra</strong>
+              <span>A raven who misses nothing and a planar kitten who misses gravity whenever possible.</span>
+            </li>
+          </ul>
+        </section>
+
+        <section class="panel-card">
+          <p class="panel-label">Current Tension</p>
+          <p id="tensionText" class="panel-copy"></p>
+        </section>
+
+        <section class="panel-card">
+          <p class="panel-label">Controls</p>
+          <div class="controls-panel">
+            <button id="newGameButton" class="control-button secondary" type="button">
+              Restart Chapter
+            </button>
+            <button id="saveButton" class="control-button" type="button">
+              Export Save
+            </button>
+            <button id="loadButton" class="control-button secondary" type="button">
+              Import Save
+            </button>
+            <input id="loadInput" type="file" accept=".txt,.json" hidden />
+          </div>
+        </section>
+      </aside>
     </main>
 
     <script src="./app.js"></script>

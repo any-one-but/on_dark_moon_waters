@@ -1,13 +1,14 @@
-# On Dark Moon Waters
+# Ponderosa - Chapter One
 
-A browser-based text RPG built with plain HTML, CSS, and JavaScript.
+A browser-based narrative RPG prototype built with plain HTML, CSS, and JavaScript.
 
 ## Features
 
-- Branching narrative with multiple endings
+- Center-column transcript UI that logs system prompts and Eve's chosen replies
+- Chapter one story flow covering the townhouse morning, the university, and the cathedral meeting
+- Diegetic attribute assignment and persistent faction allegiance tracking
 - Autosave to browser `localStorage`
-- Downloadable plaintext save files
-- Save import to restore progress from disk
+- Exportable plaintext save files and matching import support
 - No build step required
 
 ## Run locally
