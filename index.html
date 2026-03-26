@@ -22,20 +22,10 @@
 
       <section id="playView" class="view hidden">
         <aside class="pane play-pane-left">
-          <div class="pane-card">
-            <p class="eyebrow">Play Mode</p>
+          <div class="play-pane-scroll">
             <h1 id="playGameName">No game loaded</h1>
             <p id="playChapterName" class="subhead"></p>
-            <p id="playMetaSummary" class="copy"></p>
-          </div>
-
-          <div class="pane-card">
-            <p class="eyebrow">Session</p>
-            <div id="playSessionInfo" class="stack compact"></div>
-          </div>
-
-          <div class="pane-card">
-            <p class="eyebrow">Controls</p>
+            <hr class="panel-rule play-rule" />
             <div class="button-stack">
               <button id="playLoadGameButton" class="button secondary" type="button">
                 Load Game File
@@ -49,123 +39,104 @@
               <button id="playRestartButton" class="button secondary" type="button">
                 Restart Run
               </button>
+              <button id="playBackChoiceButton" class="button secondary hidden" type="button">
+                Back One Choice
+              </button>
+              <button id="playReturnEditorButton" class="button secondary hidden" type="button">
+                Return to Editor
+              </button>
               <button id="playBackHomeButton" class="button ghost" type="button">
                 Return to Menu
               </button>
             </div>
-          </div>
-
-          <div class="pane-card">
-            <p class="eyebrow">Validation</p>
-            <div id="playValidationSummary" class="stack compact"></div>
+            <div id="playValidationCard" class="hidden">
+              <hr class="panel-rule play-rule" />
+              <div id="playValidationSummary" class="stack compact"></div>
+            </div>
           </div>
         </aside>
 
         <section class="pane play-pane-center">
-          <header class="center-header">
-            <div>
-              <p class="eyebrow">Transcript</p>
-              <h2>Current play log</h2>
-            </div>
-            <p class="copy">Messages, choices, and chapter transitions accumulate here.</p>
-          </header>
-
           <div id="playLog" class="play-log"></div>
-
-          <section class="choice-panel">
-            <p class="eyebrow">Available Options</p>
-            <div id="playCurrentMessage" class="current-message"></div>
+          <div class="choice-panel">
+            <div id="playCurrentMessage" class="current-message hidden"></div>
+            <hr class="panel-rule play-rule" />
             <div id="playOptions" class="option-list"></div>
-          </section>
+          </div>
         </section>
 
         <aside class="pane play-pane-right">
-          <div class="pane-card">
-            <p class="eyebrow">Notes</p>
+          <div class="play-pane-scroll">
+            <h3>Notes</h3>
             <textarea
               id="playNotes"
               class="notes-field"
               placeholder="Player notes are saved with the run."
             ></textarea>
-          </div>
-
-          <div class="pane-card">
-            <p class="eyebrow">Trackers</p>
-            <div id="playTrackerGroups" class="stack"></div>
-          </div>
-
-          <div class="pane-card">
-            <p class="eyebrow">Flags</p>
-            <div id="playFlags" class="stack compact"></div>
+            <div id="playTrackerCard" class="hidden">
+              <hr class="panel-rule play-rule" />
+              <h3>Integers</h3>
+              <div id="playTrackerGroups" class="stack play-detail-list"></div>
+            </div>
+            <div id="playFlagsCard" class="hidden">
+              <hr class="panel-rule play-rule" />
+              <h3>Enums</h3>
+              <div id="playFlags" class="stack compact play-detail-list"></div>
+            </div>
+            <div id="playProfilesCard" class="hidden">
+              <hr class="panel-rule play-rule" />
+              <h3>Profiles</h3>
+              <div id="playProfiles" class="stack compact play-detail-list"></div>
+            </div>
           </div>
         </aside>
       </section>
 
       <section id="createView" class="view hidden">
-        <aside class="create-sidebar">
-          <div class="pane-card">
-            <p class="eyebrow">Create Mode</p>
-            <h2 id="editorGameName">Untitled Game</h2>
-            <p id="editorStatus" class="copy"></p>
-            <div class="button-stack slim">
-              <button id="editorNewButton" class="button secondary" type="button">
-                New Game
-              </button>
-              <button id="editorLoadButton" class="button secondary" type="button">
-                Load Game File
-              </button>
-              <button id="editorDownloadButton" class="button" type="button">
-                Download Game
-              </button>
-              <button id="editorTestPlayButton" class="button secondary" type="button">
-                Test Play
-              </button>
-              <button id="editorBackHomeButton" class="button ghost" type="button">
-                Return to Menu
-              </button>
-            </div>
+        <div id="graphViewport" class="graph-viewport create-canvas">
+          <div class="hidden">
+            <button id="editorNewButton" type="button">New Game</button>
+            <button id="editorLoadButton" type="button">Load Game File</button>
+            <button id="editorDownloadButton" type="button">Download Game</button>
+            <button id="editorTestPlayButton" type="button">Test Play</button>
+            <button id="editorBackHomeButton" type="button">Return to Menu</button>
+          </div>
+          <div id="graphWorld" class="graph-world">
+            <svg id="graphConnections" class="graph-connections"></svg>
+            <div id="graphNodes" class="graph-nodes"></div>
           </div>
 
-          <div class="pane-card">
-            <p class="eyebrow">Global Data</p>
-            <div id="editorTabButtons" class="tab-list"></div>
-            <div id="editorSidebarContent" class="sidebar-scroll"></div>
-          </div>
-        </aside>
-
-        <section class="create-center">
-          <header class="graph-toolbar">
-            <div class="toolbar-group">
-              <button id="graphAddNodeButton" class="button" type="button">Add Message</button>
-              <button id="graphCenterButton" class="button secondary" type="button">
-                Center Graph
-              </button>
+          <aside class="create-panel create-panel-left">
+            <div class="create-panel-head">
+              <p class="eyebrow">Create Mode</p>
+              <h2 id="editorGameName">Untitled Game</h2>
+              <p id="editorStatus" class="copy"></p>
+              <div id="editorTabButtons" class="tab-list"></div>
             </div>
-            <div class="toolbar-group">
-              <button id="graphZoomOutButton" class="button secondary" type="button">
-                -
-              </button>
+            <div id="editorSidebarContent" class="create-panel-scroll"></div>
+          </aside>
+
+          <aside id="editorInspectorShell" class="create-panel create-panel-right hidden">
+            <div id="editorInspector" class="create-panel-scroll"></div>
+          </aside>
+
+          <div class="graph-floating-controls">
+            <button id="graphAddNodeButton" class="graph-fab graph-fab-primary" type="button" title="Add message">
+              +
+            </button>
+            <button id="graphAddClusterButton" class="graph-fab" type="button" title="Add cluster">
+              ◌
+            </button>
+            <button id="graphCenterButton" class="graph-fab" type="button" title="Center graph">
+              ⌖
+            </button>
+            <div class="graph-zoom-cluster">
+              <button id="graphZoomOutButton" class="graph-fab" type="button" title="Zoom out">-</button>
               <span id="graphZoomLabel" class="zoom-label">100%</span>
-              <button id="graphZoomInButton" class="button secondary" type="button">
-                +
-              </button>
-            </div>
-          </header>
-
-          <div id="graphViewport" class="graph-viewport">
-            <div id="graphWorld" class="graph-world">
-              <svg id="graphConnections" class="graph-connections"></svg>
-              <div id="graphNodes" class="graph-nodes"></div>
+              <button id="graphZoomInButton" class="graph-fab" type="button" title="Zoom in">+</button>
             </div>
           </div>
-        </section>
-
-        <aside class="inspector-sidebar">
-          <div class="pane-card inspector-card">
-            <p class="eyebrow">Inspector</p>
-            <div id="editorInspector" class="sidebar-scroll"></div>
-          </div>
-        </aside>
+        </div>
       </section>
     </main>
 

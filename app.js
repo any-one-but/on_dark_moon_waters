@@ -11,15 +11,21 @@ const NODE_HEADER_HEIGHT = 92;
 const NODE_OPTION_HEIGHT = 38;
 
 const CREATE_TABS = [
-  { id: "metadata", label: "Metadata" },
+  { id: "system", label: "System" },
+  { id: "world", label: "World Settings" },
   { id: "chapters", label: "Chapters" },
-  { id: "trackers", label: "Trackers" },
+  { id: "trackers", label: "Integers" },
   { id: "groups", label: "Groups" },
-  { id: "flags", label: "Flags" },
-  { id: "validation", label: "Validation" },
+  { id: "flags", label: "Enums" },
+  { id: "profiles", label: "Profiles" },
+  { id: "strings", label: "Strings" },
 ];
 
-const TRACKER_OPERATORS = ["=", "<", ">", "<=", ">="];
+const TRACKER_OPERATORS = ["=", "!=", "<", ">", "<=", ">="];
+const REQUIREMENT_JOIN_OPTIONS = [
+  { value: "and", label: "All must pass" },
+  { value: "or", label: "Any may pass" },
+];
 const DIRECTION_OPTIONS = [
   { value: "both", label: "Can increase or decrease" },
   { value: "increase", label: "Only increasing" },
@@ -55,19 +61,25 @@ const refs = {
   playSaveInput: document.getElementById("playSaveInput"),
   playGameName: document.getElementById("playGameName"),
   playChapterName: document.getElementById("playChapterName"),
-  playMetaSummary: document.getElementById("playMetaSummary"),
-  playSessionInfo: document.getElementById("playSessionInfo"),
+  playValidationCard: document.getElementById("playValidationCard"),
   playValidationSummary: document.getElementById("playValidationSummary"),
   playLog: document.getElementById("playLog"),
   playCurrentMessage: document.getElementById("playCurrentMessage"),
   playOptions: document.getElementById("playOptions"),
   playNotes: document.getElementById("playNotes"),
+  playNotesCard: document.getElementById("playNotesCard"),
+  playTrackerCard: document.getElementById("playTrackerCard"),
   playTrackerGroups: document.getElementById("playTrackerGroups"),
+  playFlagsCard: document.getElementById("playFlagsCard"),
   playFlags: document.getElementById("playFlags"),
+  playProfilesCard: document.getElementById("playProfilesCard"),
+  playProfiles: document.getElementById("playProfiles"),
   playLoadGameButton: document.getElementById("playLoadGameButton"),
   playImportSaveButton: document.getElementById("playImportSaveButton"),
   playExportSaveButton: document.getElementById("playExportSaveButton"),
   playRestartButton: document.getElementById("playRestartButton"),
+  playBackChoiceButton: document.getElementById("playBackChoiceButton"),
+  playReturnEditorButton: document.getElementById("playReturnEditorButton"),
   playBackHomeButton: document.getElementById("playBackHomeButton"),
   editorGameName: document.getElementById("editorGameName"),
   editorStatus: document.getElementById("editorStatus"),
@@ -87,7 +99,9 @@ const refs = {
   graphWorld: document.getElementById("graphWorld"),
   graphConnections: document.getElementById("graphConnections"),
   graphNodes: document.getElementById("graphNodes"),
+  editorInspectorShell: document.getElementById("editorInspectorShell"),
   editorInspector: document.getElementById("editorInspector"),
+  graphAddClusterButton: document.getElementById("graphAddClusterButton"),
 };
 
 const appState = {
@@ -97,15 +111,24 @@ const appState = {
   playState: null,
   playValidation: [],
   playError: null,
-  createTab: "metadata",
+  playContext: {
+    fromDraft: false,
+  },
+  createTab: "system",
   selection: {
     nodeId: null,
+    clusterId: null,
+    paragraphId: null,
     optionId: null,
+    trackerMenuId: null,
+    nodeMenuId: null,
+    paragraphMenuId: null,
   },
   graph: {
     panX: 140,
     panY: 110,
     zoom: 1,
+    suppressNextGraphClick: false,
   },
   drag: null,
 };
@@ -126,6 +149,8 @@ function bindGlobalEvents() {
   refs.playImportSaveButton.addEventListener("click", () => refs.playSaveInput.click());
   refs.playExportSaveButton.addEventListener("click", exportPlaySave);
   refs.playRestartButton.addEventListener("click", restartPlaySession);
+  refs.playBackChoiceButton.addEventListener("click", rewindTestPlayChoice);
+  refs.playReturnEditorButton.addEventListener("click", () => switchView("create"));
   refs.playBackHomeButton.addEventListener("click", () => switchView("home"));
   refs.playGameInput.addEventListener("change", handlePlayGameImport);
   refs.createGameInput.addEventListener("change", handleCreateGameImport);
@@ -136,9 +161,9 @@ function bindGlobalEvents() {
   refs.editorNewButton.addEventListener("click", () => {
     appState.createGame = createGameScaffold();
     normalizeEditorSelection();
-    centerGraph();
     persistEditorDraft();
     switchView("create");
+    requestAnimationFrame(centerGraph);
   });
   refs.editorLoadButton.addEventListener("click", () => refs.createGameInput.click());
   refs.editorDownloadButton.addEventListener("click", exportEditorGame);
@@ -156,14 +181,18 @@ function bindGlobalEvents() {
   refs.editorInspector.addEventListener("click", handleInspectorClick);
   refs.editorInspector.addEventListener("change", handleInspectorChange);
   refs.graphAddNodeButton.addEventListener("click", addNodeAtViewportCenter);
+  refs.graphAddClusterButton.addEventListener("click", addClusterAtViewportCenter);
   refs.graphCenterButton.addEventListener("click", centerGraph);
-  refs.graphZoomInButton.addEventListener("click", () => zoomGraph(1.12));
-  refs.graphZoomOutButton.addEventListener("click", () => zoomGraph(1 / 1.12));
-  refs.graphNodes.addEventListener("click", handleGraphSelection);
+  refs.graphZoomInButton.addEventListener("click", () => zoomGraph(1.06));
+  refs.graphZoomOutButton.addEventListener("click", () => zoomGraph(1 / 1.06));
+  refs.graphNodes.addEventListener("click", handleGraphClick);
+  refs.graphNodes.addEventListener("change", handleGraphChange);
+  refs.graphNodes.addEventListener("focusin", handleGraphFocusIn);
   refs.graphNodes.addEventListener("mousedown", handleNodeDragStart);
   refs.graphViewport.addEventListener("mousedown", handleViewportPanStart);
   refs.graphViewport.addEventListener("wheel", handleGraphWheel, { passive: false });
 
+  document.addEventListener("mousedown", handleDocumentMouseDown);
   document.addEventListener("mousemove", handleDocumentDrag);
   document.addEventListener("mouseup", handleDocumentDragEnd);
 }
@@ -190,81 +219,53 @@ function renderApp() {
 function renderHomeView() {
   const draft = appState.createGame;
   const draftSummary = draft
-    ? `${draft.chapters.length} chapters · ${draft.nodes.length} messages · ${validateGame(draft).filter((issue) => issue.severity === "error").length} errors`
+    ? `${draft.chapters.length} chapters · ${draft.nodes.length} messages`
     : "No local draft stored yet.";
 
   refs.homeView.innerHTML = `
     <div class="home-shell">
-      <section class="home-hero">
-        <article class="mode-card">
-          <p class="eyebrow">Unified Tool</p>
-          <h1>${APP_NAME}</h1>
-          <p class="copy">
-            Author and play single-file chapter-based text games from the same web app. The editor works on a directed graph of messages and options; the player runs the same authored data with trackers, flags, saves, notes, and validation-aware playback.
-          </p>
-        </article>
-
-        <article class="mode-card">
-          <p class="eyebrow">Format</p>
-          <div class="badge-row" style="margin-top: 14px;">
-            <span class="chip">Single game file</span>
-            <span class="chip">Ordered chapters</span>
-            <span class="chip">Trackers + flags</span>
-            <span class="chip">Conditional options</span>
-            <span class="chip">Create + Play</span>
-          </div>
-          <p class="copy">
-            Chapters are the only built-in structural subdivision. Nodes hold authored messages. Options hold rules, effects, and graph transitions.
-          </p>
-        </article>
-      </section>
-
-      <section class="home-actions">
-        <article class="mode-card">
-          <p class="eyebrow">Play</p>
-          <h2>Load and run a game</h2>
-          <p class="copy">
-            Import a game file, validate it, initialize a live state object, and play it in the three-pane runtime.
-          </p>
-          <div class="mode-grid" style="margin-top: 14px;">
-            <div class="mode-action">
-              <h3>Load game file</h3>
-              <p class="copy">Choose a `.json` file and start a run with validation before play begins.</p>
-              <div class="button-stack slim">
-                <button class="button" type="button" data-action="home-play-load">Choose Game File</button>
-                ${
-                  draft
-                    ? '<button class="button secondary" type="button" data-action="home-play-draft">Play Current Draft</button>'
-                    : ""
-                }
-              </div>
+      <article class="mode-card">
+        <p class="eyebrow">Play</p>
+        <h1>Play</h1>
+        <p class="copy">
+          Load a game file and start a run.
+        </p>
+        <div class="mode-grid" style="margin-top: 18px;">
+          <div class="mode-action">
+            <p class="copy">Choose a <code>.json</code> file and begin.</p>
+            <div class="button-stack slim">
+              <button class="button" type="button" data-action="home-play-load">Choose Game File</button>
+              ${
+                draft
+                  ? '<button class="button secondary" type="button" data-action="home-play-draft">Play Current Draft</button>'
+                  : ""
+              }
             </div>
           </div>
-        </article>
+        </div>
+      </article>
 
-        <article class="mode-card">
-          <p class="eyebrow">Create</p>
-          <h2>Build and edit games</h2>
-          <p class="copy">
-            Work in the node graph, edit global structures, validate authored data, and test-play the current draft without leaving the tool.
-          </p>
-          <div class="mode-grid" style="margin-top: 14px;">
-            <div class="mode-action">
-              <h3>Local draft</h3>
-              <p class="copy">${escapeHtml(draftSummary)}</p>
-              <div class="button-stack slim">
-                <button class="button" type="button" data-action="home-create-new">Start New Game</button>
-                <button class="button secondary" type="button" data-action="home-create-load">Load Game File</button>
-                ${
-                  draft
-                    ? '<button class="button ghost" type="button" data-action="home-create-draft">Continue Draft</button>'
-                    : ""
-                }
-              </div>
+      <article class="mode-card">
+        <p class="eyebrow">Create</p>
+        <h1>Create</h1>
+        <p class="copy">
+          Build or continue a game in the editor.
+        </p>
+        <div class="mode-grid" style="margin-top: 18px;">
+          <div class="mode-action">
+            <p class="copy">${escapeHtml(draftSummary)}</p>
+            <div class="button-stack slim">
+              <button class="button" type="button" data-action="home-create-new">Start New Game</button>
+              <button class="button secondary" type="button" data-action="home-create-load">Load Game File</button>
+              ${
+                draft
+                  ? '<button class="button ghost" type="button" data-action="home-create-draft">Continue Draft</button>'
+                  : ""
+              }
             </div>
           </div>
-        </article>
-      </section>
+        </div>
+      </article>
     </div>
   `;
 }
@@ -278,59 +279,48 @@ function renderPlayView() {
 
   refs.playGameName.textContent = game?.metadata.name ?? "No game loaded";
   refs.playChapterName.textContent = currentChapter ? currentChapter.name : "";
-  refs.playMetaSummary.textContent =
-    game?.metadata.description ||
-    (appState.playError
-      ? "This game failed validation and was not allowed to start."
-      : "Load a game file to begin.");
-
-  refs.playSessionInfo.innerHTML = game
-    ? [
-        renderSessionRow("Game ID", game.metadata.id),
-        renderSessionRow(
-          "Chapter",
-          currentChapter
-            ? `${getChapterIndex(game, currentChapter.id) + 1} of ${game.chapters.length}`
-            : "Not active"
-        ),
-        renderSessionRow("Current message", currentNode?.name ?? "Unavailable"),
-        renderSessionRow("Autosave", playState ? formatTimestamp(playState.updatedAt) : "Not started"),
-      ].join("")
-    : `<div class="session-row">No session active.</div>`;
+  refs.playBackChoiceButton.classList.toggle(
+    "hidden",
+    !appState.playContext.fromDraft || !playState || playState.history.length === 0
+  );
+  refs.playReturnEditorButton.classList.toggle("hidden", !appState.playContext.fromDraft);
 
   const errors = validation.filter((issue) => issue.severity === "error");
   const warnings = validation.filter((issue) => issue.severity === "warning");
+  const showValidation = appState.playContext.fromDraft;
 
-  refs.playValidationSummary.innerHTML = game
+  refs.playValidationCard.classList.toggle("hidden", !showValidation || !game);
+  refs.playValidationSummary.innerHTML = game && showValidation
     ? `
         <div class="validation-item">
           <strong class="${errors.length ? "status-bad" : "status-good"}">${errors.length} error${errors.length === 1 ? "" : "s"}</strong>
-          <p class="copy">${errors.length ? "Fix these in create mode before playback." : "Game file passed the required validation checks."}</p>
+          <p class="copy">${
+            errors.length
+              ? appState.playContext.fromDraft
+                ? "Test play is running despite errors so you can keep probing the flow."
+                : "Fix these in create mode before playback."
+              : "Game file passed the required validation checks."
+          }</p>
         </div>
         <div class="validation-item">
           <strong class="${warnings.length ? "status-warn" : ""}">${warnings.length} warning${warnings.length === 1 ? "" : "s"}</strong>
           <p class="copy">${warnings.length ? warnings[0].message : "No warnings."}</p>
         </div>
       `
-    : `<div class="validation-item">Validation appears here after a game is loaded.</div>`;
+    : "";
 
   renderPlayLog();
   renderPlayCurrentMessage(currentNode);
   renderPlayOptions(currentNode);
   renderPlayTrackerGroups();
   renderPlayFlags();
+  renderPlayProfiles();
   refs.playNotes.value = playState?.notes ?? "";
-}
-
-function renderSessionRow(label, value) {
-  return `<div class="session-row inline-row"><span>${escapeHtml(label)}</span><span class="value">${escapeHtml(
-    value
-  )}</span></div>`;
 }
 
 function renderPlayLog() {
   if (appState.playError?.length) {
-    refs.playLog.innerHTML = `<div class="paper-note">Playback is blocked because the loaded game has validation errors. Review the summary on the left or open the game in create mode.</div>`;
+    refs.playLog.innerHTML = `<div class="paper-note">Playback is blocked because the loaded game has validation errors.</div>`;
     return;
   }
 
@@ -355,8 +345,8 @@ function renderPlayLog() {
 
       return `
         <article class="log-entry">
-          ${entry.secondary ? `<p class="meta">${escapeHtml(entry.secondary)}</p>` : ""}
           <h3>${escapeHtml(entry.name)}</h3>
+          ${entry.secondary ? `<p class="meta">${escapeHtml(entry.secondary)}</p>` : ""}
           <p>${escapeHtml(entry.body)}</p>
         </article>
       `;
@@ -370,24 +360,25 @@ function renderPlayLog() {
 
 function renderPlayCurrentMessage(currentNode) {
   if (appState.playError?.length) {
+    refs.playCurrentMessage.classList.remove("hidden");
     refs.playCurrentMessage.innerHTML = `<div class="paper-note">The game did not start because required validation checks failed.</div>`;
     return;
   }
 
   if (!appState.playGame || !appState.playState) {
+    refs.playCurrentMessage.classList.remove("hidden");
     refs.playCurrentMessage.innerHTML = `<div class="paper-note">No game is active.</div>`;
     return;
   }
 
   if (!currentNode) {
+    refs.playCurrentMessage.classList.remove("hidden");
     refs.playCurrentMessage.innerHTML = `<div class="paper-note">The active message could not be found.</div>`;
     return;
   }
 
-  refs.playCurrentMessage.innerHTML = `
-    ${currentNode.secondary ? `<p class="message-secondary">${escapeHtml(currentNode.secondary)}</p>` : ""}
-    <p class="message-body">${escapeHtml(currentNode.body)}</p>
-  `;
+  refs.playCurrentMessage.classList.add("hidden");
+  refs.playCurrentMessage.innerHTML = "";
 }
 
 function renderPlayOptions(currentNode) {
@@ -418,6 +409,7 @@ function renderPlayOptions(currentNode) {
   refs.playOptions.innerHTML = options
     .map(({ option, availability }) => {
       const note = buildOptionInlineNote(appState.playGame, appState.playState, option);
+      const optionText = interpolateText(appState.playGame, appState.playState, option.text);
 
       return `
         <button
@@ -426,7 +418,7 @@ function renderPlayOptions(currentNode) {
           data-option-id="${escapeAttr(option.id)}"
           ${availability.state === "disabled" ? "disabled" : ""}
         >
-          ${escapeHtml(option.text)}
+          ${escapeHtml(optionText)}
           ${note ? `<span class="option-note">${escapeHtml(note)}</span>` : ""}
         </button>
       `;
@@ -439,11 +431,13 @@ function renderPlayTrackerGroups() {
   const playState = appState.playState;
 
   if (!game || !playState) {
-    refs.playTrackerGroups.innerHTML = `<div class="paper-note">Trackers appear once a game is running.</div>`;
+    refs.playTrackerCard.classList.add("hidden");
+    refs.playTrackerGroups.innerHTML = "";
     return;
   }
 
   const groups = buildTrackerDisplayGroups(game);
+  refs.playTrackerCard.classList.toggle("hidden", !groups.length);
 
   refs.playTrackerGroups.innerHTML = groups.length
     ? groups
@@ -451,24 +445,22 @@ function renderPlayTrackerGroups() {
           return `
             <div class="tracker-group-card">
               <strong>${escapeHtml(group.name)}</strong>
-              <div style="margin-top: 10px;">
-                ${group.trackers
-                  .map((tracker) => {
-                    const value = playState.trackers[tracker.id] ?? tracker.startValue;
-                    return `
-                      <div class="tracker-row">
-                        <span>${escapeHtml(tracker.name)}</span>
-                        <span class="value">${escapeHtml(formatTrackerValue(tracker, value))}</span>
-                      </div>
-                    `;
-                  })
-                  .join("")}
-              </div>
+              ${group.trackers
+                .map((tracker) => {
+                  const value = playState.trackers[tracker.id] ?? tracker.startValue;
+                  return `
+                    <div class="tracker-row">
+                      <span>${escapeHtml(tracker.name)}</span>
+                      <span class="value">${escapeHtml(formatTrackerValue(tracker, value))}</span>
+                    </div>
+                  `;
+                })
+                .join("")}
             </div>
           `;
         })
         .join("")
-    : `<div class="paper-note">This game has no trackers defined.</div>`;
+    : "";
 }
 
 function renderPlayFlags() {
@@ -476,12 +468,16 @@ function renderPlayFlags() {
   const playState = appState.playState;
 
   if (!game || !playState) {
-    refs.playFlags.innerHTML = `<div class="paper-note">Flags appear once a game is running.</div>`;
+    refs.playFlagsCard.classList.add("hidden");
+    refs.playFlags.innerHTML = "";
     return;
   }
 
-  refs.playFlags.innerHTML = game.flags.length
-    ? game.flags
+  const visibleFlags = game.flags.filter((flag) => flag.visible);
+  refs.playFlagsCard.classList.toggle("hidden", !visibleFlags.length);
+
+  refs.playFlags.innerHTML = visibleFlags.length
+    ? visibleFlags
         .map((flag) => {
           const value = playState.flags[flag.id];
           return `
@@ -492,7 +488,35 @@ function renderPlayFlags() {
           `;
         })
         .join("")
-    : `<div class="paper-note">This game has no flags defined.</div>`;
+    : "";
+}
+
+function renderPlayProfiles() {
+  const game = appState.playGame;
+  const playState = appState.playState;
+
+  if (!game || !playState) {
+    refs.playProfilesCard.classList.add("hidden");
+    refs.playProfiles.innerHTML = "";
+    return;
+  }
+
+  const visibleProfiles = game.profiles.filter((profile) => profile.visible);
+  refs.playProfilesCard.classList.toggle("hidden", !visibleProfiles.length);
+
+  refs.playProfiles.innerHTML = visibleProfiles.length
+    ? visibleProfiles
+        .map((profile) => {
+          const value = playState.profiles?.[profile.id];
+          return `
+            <div class="flag-card inline-row">
+              <span>${escapeHtml(profile.name)}</span>
+              <span class="value">${escapeHtml(value === null || value === undefined ? "null" : String(value))}</span>
+            </div>
+          `;
+        })
+        .join("")
+    : "";
 }
 
 function renderCreateView() {
@@ -502,8 +526,9 @@ function renderCreateView() {
     refs.editorGameName.textContent = "Untitled Game";
     refs.editorStatus.textContent = "Start a new game or load a file.";
     refs.editorTabButtons.innerHTML = "";
-    refs.editorSidebarContent.innerHTML = `<div class="paper-note">No editor draft loaded.</div>`;
-    refs.editorInspector.innerHTML = `<div class="paper-note">Select or create a message to inspect it.</div>`;
+    refs.editorSidebarContent.innerHTML = `<div class="paper-note">No draft is loaded yet.</div>`;
+    refs.editorInspector.innerHTML = "";
+    refs.editorInspectorShell.classList.add("hidden");
     refs.graphNodes.innerHTML = `<div class="empty-graph">Create a new game to begin authoring.</div>`;
     refs.graphConnections.innerHTML = "";
     refs.graphZoomLabel.textContent = `${Math.round(appState.graph.zoom * 100)}%`;
@@ -511,17 +536,13 @@ function renderCreateView() {
     return;
   }
 
-  const validation = validateGame(game);
-  const errors = validation.filter((issue) => issue.severity === "error").length;
-  const warnings = validation.filter((issue) => issue.severity === "warning").length;
-
   refs.editorGameName.textContent = game.metadata.name || "Untitled Game";
-  refs.editorStatus.textContent = `${game.nodes.length} messages · ${game.chapters.length} chapters · ${errors} error${errors === 1 ? "" : "s"} · ${warnings} warning${warnings === 1 ? "" : "s"}`;
+  refs.editorStatus.textContent = `${game.chapters.length} chapter${game.chapters.length === 1 ? "" : "s"} · ${game.nodes.length} message${game.nodes.length === 1 ? "" : "s"} · ${game.trackers.length} integer${game.trackers.length === 1 ? "" : "s"} · ${game.flags.length} enum${game.flags.length === 1 ? "" : "s"} · ${game.profiles.length} profile${game.profiles.length === 1 ? "" : "s"} · ${game.strings.length} string${game.strings.length === 1 ? "" : "s"}`;
 
   renderEditorTabs();
-  renderEditorSidebar(game, validation);
+  renderEditorSidebar(game);
   renderGraph(game);
-  renderInspector(game, validation);
+  renderInspector(game);
 }
 
 function renderEditorTabs() {
@@ -533,10 +554,13 @@ function renderEditorTabs() {
   }).join("");
 }
 
-function renderEditorSidebar(game, validation) {
+function renderEditorSidebar(game) {
   switch (appState.createTab) {
-    case "metadata":
-      refs.editorSidebarContent.innerHTML = renderMetadataTab(game);
+    case "system":
+      refs.editorSidebarContent.innerHTML = renderSystemTab(game);
+      break;
+    case "world":
+      refs.editorSidebarContent.innerHTML = renderWorldTab(game);
       break;
     case "chapters":
       refs.editorSidebarContent.innerHTML = renderChaptersTab(game);
@@ -550,21 +574,20 @@ function renderEditorSidebar(game, validation) {
     case "flags":
       refs.editorSidebarContent.innerHTML = renderFlagsTab(game);
       break;
-    case "validation":
-      refs.editorSidebarContent.innerHTML = renderValidationTab(validation);
+    case "profiles":
+      refs.editorSidebarContent.innerHTML = renderProfilesTab(game);
+      break;
+    case "strings":
+      refs.editorSidebarContent.innerHTML = renderStringsTab(game);
       break;
     default:
       refs.editorSidebarContent.innerHTML = "";
   }
 }
 
-function renderMetadataTab(game) {
+function renderSystemTab(game) {
   return `
     <div class="form-block">
-      <div class="field-group">
-        <label>Game identifier</label>
-        <input class="field" data-meta-field="id" value="${escapeAttr(game.metadata.id)}" />
-      </div>
       <div class="field-group">
         <label>Game name</label>
         <input class="field" data-meta-field="name" value="${escapeAttr(game.metadata.name)}" />
@@ -575,14 +598,55 @@ function renderMetadataTab(game) {
           game.metadata.description
         )}</textarea>
       </div>
+      <hr class="panel-rule" />
+      <div class="create-actions">
+        <div class="create-actions-row">
+          <button class="button secondary" type="button" data-action="proxy-new">New Game</button>
+          <button class="button secondary" type="button" data-action="proxy-load">Load File</button>
+        </div>
+        <div class="create-actions-row">
+          <button class="button" type="button" data-action="proxy-download">Download Game</button>
+          <button class="button secondary" type="button" data-action="proxy-test">Test Play</button>
+        </div>
+        <div class="create-actions-row">
+          <button class="button ghost" type="button" data-action="proxy-home">Return to Menu</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderWorldTab(game) {
+  return `
+    <div class="form-block">
       <div class="field-group">
-        <label>Root message</label>
-        <select class="field" data-root-node-select>
-          ${renderNodeOptions(game, game.rootNodeId)}
+        <label>Clock</label>
+        <select class="field" data-world-field="clockFormat">
+          <option value="12" ${game.world.clockFormat === "12" ? "selected" : ""}>12 hour</option>
+          <option value="24" ${game.world.clockFormat === "24" ? "selected" : ""}>24 hour</option>
         </select>
       </div>
-      <div class="paper-note">
-        A game is a single authored file. Chapters remain ordered inside that file; the runtime moves across nodes, and chapter-end options can advance into the next chapter start.
+      <div class="field-group">
+        <label>Locations</label>
+        <div class="list-block">
+          ${
+            game.world.locations.length
+              ? game.world.locations
+                  .map(
+                    (location, index) => `
+                      <div class="inline-row">
+                        <input class="field" data-location-index="${index}" value="${escapeAttr(location)}" />
+                        <button class="button small ghost" type="button" data-action="delete-location" data-location-index="${index}">Delete</button>
+                      </div>
+                    `
+                  )
+                  .join("")
+              : '<div class="paper-note">No locations in the glossary yet.</div>'
+          }
+        </div>
+      </div>
+      <div class="tracker-add-wrap">
+        <button class="list-add-fab" type="button" data-action="add-location" title="Add location">+</button>
       </div>
     </div>
   `;
@@ -590,27 +654,17 @@ function renderMetadataTab(game) {
 
 function renderChaptersTab(game) {
   return `
-    <div class="button-stack slim">
-      <button class="button" type="button" data-action="add-chapter">Add Chapter</button>
-    </div>
-    ${game.chapters
+    <div class="list-block">
+      ${game.chapters
       .map((chapter, index) => {
         const nodeCount = game.nodes.filter((node) => node.chapterId === chapter.id).length;
         return `
           <div class="item-card">
             <div class="inline-row">
               <strong>Chapter ${index + 1}</strong>
-              <div class="item-actions">
-                <button class="button small secondary" type="button" data-action="move-chapter-up" data-chapter-id="${escapeAttr(
-                  chapter.id
-                )}" ${index === 0 ? "disabled" : ""}>Up</button>
-                <button class="button small secondary" type="button" data-action="move-chapter-down" data-chapter-id="${escapeAttr(
-                  chapter.id
-                )}" ${index === game.chapters.length - 1 ? "disabled" : ""}>Down</button>
-                <button class="button small ghost" type="button" data-action="delete-chapter" data-chapter-id="${escapeAttr(
-                  chapter.id
-                )}" ${game.chapters.length === 1 ? "disabled" : ""}>Delete</button>
-              </div>
+              <button class="button small ghost" type="button" data-action="delete-chapter" data-chapter-id="${escapeAttr(
+                chapter.id
+              )}" ${game.chapters.length === 1 ? "disabled" : ""}>Delete</button>
             </div>
             <div class="field-group">
               <label>Name</label>
@@ -619,7 +673,7 @@ function renderChaptersTab(game) {
               )}" value="${escapeAttr(chapter.name)}" />
             </div>
             <div class="field-group">
-              <label>Start message</label>
+              <label>Starts on</label>
               <select class="field" data-chapter-field="startNodeId" data-chapter-id="${escapeAttr(chapter.id)}">
                 <option value="">Unassigned</option>
                 ${renderNodeOptions(game, chapter.startNodeId, chapter.id)}
@@ -627,111 +681,137 @@ function renderChaptersTab(game) {
             </div>
             <div class="inline-row">
               <span class="muted">${nodeCount} assigned message${nodeCount === 1 ? "" : "s"}</span>
-              <span class="chip">${escapeHtml(chapter.id)}</span>
             </div>
           </div>
         `;
       })
       .join("")}
+    </div>
+    <div class="tracker-add-wrap">
+      <button class="list-add-fab" type="button" data-action="add-chapter" title="Add chapter">+</button>
+    </div>
   `;
 }
 
 function renderTrackersTab(game) {
   return `
-    <div class="button-stack slim">
-      <button class="button" type="button" data-action="add-tracker">Add Tracker</button>
-    </div>
-    ${
-      game.trackers.length
-        ? game.trackers
-            .map((tracker) => {
-              return `
-                <div class="item-card">
-                  <div class="inline-row">
-                    <strong>${escapeHtml(tracker.name || "New tracker")}</strong>
-                    <button class="button small ghost" type="button" data-action="delete-tracker" data-tracker-id="${escapeAttr(
-                      tracker.id
-                    )}">Delete</button>
-                  </div>
-                  <div class="field-group">
-                    <label>Name</label>
-                    <input class="field" data-tracker-field="name" data-tracker-id="${escapeAttr(
-                      tracker.id
-                    )}" value="${escapeAttr(tracker.name)}" />
-                  </div>
-                  <div class="inline-form">
-                    <div class="field-group">
-                      <label>Start value</label>
-                      <input class="field" type="number" data-tracker-field="startValue" data-tracker-id="${escapeAttr(
-                        tracker.id
-                      )}" value="${escapeAttr(String(tracker.startValue))}" />
+    <div class="list-block">
+      ${
+        game.trackers.length
+          ? game.trackers
+              .map((tracker) => {
+                const menuOpen = appState.selection.trackerMenuId === tracker.id;
+                return `
+                  <div class="item-card">
+                    <div class="inline-row tracker-card-head">
+                      <strong>${escapeHtml(tracker.name || "New integer")}</strong>
+                      <div class="menu-wrap">
+                        <button class="button small ghost menu-button" type="button" data-action="toggle-tracker-menu" data-tracker-id="${escapeAttr(
+                          tracker.id
+                        )}">···</button>
+                        ${
+                          menuOpen
+                            ? `
+                                <div class="popover-menu">
+                                  <button class="popover-item" type="button" data-action="duplicate-tracker" data-tracker-id="${escapeAttr(
+                                    tracker.id
+                                  )}">Duplicate</button>
+                                  <button class="popover-item" type="button" data-action="delete-tracker" data-tracker-id="${escapeAttr(
+                                    tracker.id
+                                  )}">Delete</button>
+                                </div>
+                              `
+                            : ""
+                        }
+                      </div>
                     </div>
                     <div class="field-group">
-                      <label>Group</label>
-                      <select class="field" data-tracker-field="groupId" data-tracker-id="${escapeAttr(tracker.id)}">
-                        <option value="">Ungrouped</option>
-                        ${game.trackerGroups
-                          .map(
-                            (group) =>
-                              `<option value="${escapeAttr(group.id)}" ${
-                                tracker.groupId === group.id ? "selected" : ""
-                              }>${escapeHtml(group.name || group.id)}</option>`
-                          )
-                          .join("")}
+                      <label>Name</label>
+                      <input class="field" data-tracker-field="name" data-tracker-id="${escapeAttr(
+                        tracker.id
+                      )}" value="${escapeAttr(tracker.name)}" />
+                    </div>
+                    <div class="inline-form">
+                      <div class="field-group">
+                        <label>Start Value</label>
+                        <input class="field" type="number" data-tracker-field="startValue" data-tracker-id="${escapeAttr(
+                          tracker.id
+                        )}" value="${escapeAttr(String(tracker.startValue))}" />
+                      </div>
+                      <div class="field-group">
+                        <label>Group</label>
+                        <select class="field" data-tracker-field="groupId" data-tracker-id="${escapeAttr(tracker.id)}">
+                          <option value="">Ungrouped</option>
+                          ${game.trackerGroups
+                            .map(
+                              (group) =>
+                                `<option value="${escapeAttr(group.id)}" ${
+                                  tracker.groupId === group.id ? "selected" : ""
+                                }>${escapeHtml(group.name || group.id)}</option>`
+                            )
+                            .join("")}
+                        </select>
+                      </div>
+                    </div>
+                    <label class="node-toggle">
+                      <input type="checkbox" data-tracker-field="visible" data-tracker-id="${escapeAttr(
+                        tracker.id
+                      )}" ${tracker.visible ? "checked" : ""} />
+                      Show in Play
+                    </label>
+                    <div class="inline-form">
+                      <div class="field-group">
+                        <label>Lower Bound</label>
+                        <input class="field" type="number" data-tracker-field="min" data-tracker-id="${escapeAttr(
+                          tracker.id
+                        )}" value="${tracker.min === null ? "" : escapeAttr(String(tracker.min))}" />
+                      </div>
+                      <div class="field-group">
+                        <label>Upper Bound</label>
+                        <input class="field" type="number" data-tracker-field="max" data-tracker-id="${escapeAttr(
+                          tracker.id
+                        )}" value="${tracker.max === null ? "" : escapeAttr(String(tracker.max))}" />
+                      </div>
+                    </div>
+                    <div class="field-group">
+                      <label>Directional Restriction</label>
+                      <select class="field" data-tracker-field="direction" data-tracker-id="${escapeAttr(tracker.id)}">
+                        ${DIRECTION_OPTIONS.map(
+                          (option) =>
+                            `<option value="${option.value}" ${
+                              tracker.direction === option.value ? "selected" : ""
+                            }>${escapeHtml(option.label)}</option>`
+                        ).join("")}
+                      </select>
+                    </div>
+                    <div class="field-group">
+                      <label>Sign Restriction</label>
+                      <select class="field" data-tracker-field="sign" data-tracker-id="${escapeAttr(tracker.id)}">
+                        ${SIGN_OPTIONS.map(
+                          (option) =>
+                            `<option value="${option.value}" ${
+                              tracker.sign === option.value ? "selected" : ""
+                            }>${escapeHtml(option.label)}</option>`
+                        ).join("")}
                       </select>
                     </div>
                   </div>
-                  <div class="inline-form">
-                    <div class="field-group">
-                      <label>Lower bound</label>
-                      <input class="field" type="number" data-tracker-field="min" data-tracker-id="${escapeAttr(
-                        tracker.id
-                      )}" value="${tracker.min === null ? "" : escapeAttr(String(tracker.min))}" />
-                    </div>
-                    <div class="field-group">
-                      <label>Upper bound</label>
-                      <input class="field" type="number" data-tracker-field="max" data-tracker-id="${escapeAttr(
-                        tracker.id
-                      )}" value="${tracker.max === null ? "" : escapeAttr(String(tracker.max))}" />
-                    </div>
-                  </div>
-                  <div class="field-group">
-                    <label>Directional restriction</label>
-                    <select class="field" data-tracker-field="direction" data-tracker-id="${escapeAttr(tracker.id)}">
-                      ${DIRECTION_OPTIONS.map(
-                        (option) =>
-                          `<option value="${option.value}" ${
-                            tracker.direction === option.value ? "selected" : ""
-                          }>${escapeHtml(option.label)}</option>`
-                      ).join("")}
-                    </select>
-                  </div>
-                  <div class="field-group">
-                    <label>Sign restriction</label>
-                    <select class="field" data-tracker-field="sign" data-tracker-id="${escapeAttr(tracker.id)}">
-                      ${SIGN_OPTIONS.map(
-                        (option) =>
-                          `<option value="${option.value}" ${
-                            tracker.sign === option.value ? "selected" : ""
-                          }>${escapeHtml(option.label)}</option>`
-                      ).join("")}
-                    </select>
-                  </div>
-                </div>
-              `;
-            })
-            .join("")
-        : '<div class="paper-note">No trackers defined yet.</div>'
-    }
+                `;
+              })
+              .join("")
+          : '<div class="paper-note">No integers defined yet.</div>'
+      }
+    </div>
+    <div class="tracker-add-wrap">
+      <button class="list-add-fab" type="button" data-action="add-tracker" title="Add integer">+</button>
+    </div>
   `;
 }
 
 function renderGroupsTab(game) {
   return `
-    <div class="button-stack slim">
-      <button class="button" type="button" data-action="add-group">Add Tracker Group</button>
-    </div>
-    ${
+    <div class="list-block">
+      ${
       game.trackerGroups.length
         ? game.trackerGroups
             .map((group, index) => {
@@ -739,17 +819,9 @@ function renderGroupsTab(game) {
                 <div class="item-card">
                   <div class="inline-row">
                     <strong>Group ${index + 1}</strong>
-                    <div class="item-actions">
-                      <button class="button small secondary" type="button" data-action="move-group-up" data-group-id="${escapeAttr(
-                        group.id
-                      )}" ${index === 0 ? "disabled" : ""}>Up</button>
-                      <button class="button small secondary" type="button" data-action="move-group-down" data-group-id="${escapeAttr(
-                        group.id
-                      )}" ${index === game.trackerGroups.length - 1 ? "disabled" : ""}>Down</button>
-                      <button class="button small ghost" type="button" data-action="delete-group" data-group-id="${escapeAttr(
-                        group.id
-                      )}">Delete</button>
-                    </div>
+                    <button class="button small ghost" type="button" data-action="delete-group" data-group-id="${escapeAttr(
+                      group.id
+                    )}">Delete</button>
                   </div>
                   <div class="field-group">
                     <label>Display name</label>
@@ -757,29 +829,31 @@ function renderGroupsTab(game) {
                       group.id
                     )}" value="${escapeAttr(group.name)}" />
                   </div>
-                  <p class="copy">${game.trackers.filter((tracker) => tracker.groupId === group.id).length} tracker(s) assigned</p>
+                  <p class="copy">${game.trackers.filter((tracker) => tracker.groupId === group.id).length} integer(s) assigned</p>
                 </div>
               `;
             })
             .join("")
-        : '<div class="paper-note">No tracker groups defined. Trackers can still appear as Ungrouped.</div>'
+        : '<div class="paper-note">No integer groups defined. Integers can still appear as Ungrouped.</div>'
     }
+    </div>
+    <div class="tracker-add-wrap">
+      <button class="list-add-fab" type="button" data-action="add-group" title="Add group">+</button>
+    </div>
   `;
 }
 
 function renderFlagsTab(game) {
   return `
-    <div class="button-stack slim">
-      <button class="button" type="button" data-action="add-flag">Add Flag</button>
-    </div>
-    ${
+    <div class="list-block">
+      ${
       game.flags.length
         ? game.flags
             .map((flag) => {
               return `
                 <div class="item-card">
                   <div class="inline-row">
-                    <strong>${escapeHtml(flag.name || "New flag")}</strong>
+                    <strong>${escapeHtml(flag.name || "New enum")}</strong>
                     <button class="button small ghost" type="button" data-action="delete-flag" data-flag-id="${escapeAttr(
                       flag.id
                     )}">Delete</button>
@@ -790,8 +864,14 @@ function renderFlagsTab(game) {
                       flag.id
                     )}" value="${escapeAttr(flag.name)}" />
                   </div>
+                  <label class="node-toggle">
+                    <input type="checkbox" data-flag-field="visible" data-flag-id="${escapeAttr(
+                      flag.id
+                    )}" ${flag.visible ? "checked" : ""} />
+                    Show in Play
+                  </label>
                   <div class="field-group">
-                    <label>Custom states</label>
+                    <label>States</label>
                     <textarea class="textarea" data-flag-field="states" data-flag-id="${escapeAttr(
                       flag.id
                     )}" placeholder="Comma or newline separated states">${escapeHtml(flag.states.join(", "))}</textarea>
@@ -801,133 +881,260 @@ function renderFlagsTab(game) {
               `;
             })
             .join("")
-        : '<div class="paper-note">No flags defined yet.</div>'
+        : '<div class="paper-note">No enums defined yet.</div>'
     }
+    </div>
+    <div class="tracker-add-wrap">
+      <button class="list-add-fab" type="button" data-action="add-flag" title="Add enum">+</button>
+    </div>
   `;
 }
 
-function renderValidationTab(validation) {
-  if (!validation.length) {
-    return `<div class="paper-note">No validation issues.</div>`;
-  }
-
-  return validation
-    .map(
-      (issue) => `
-        <div class="validation-item">
-          <strong class="${issue.severity === "error" ? "status-bad" : "status-warn"}">${escapeHtml(
-            issue.severity.toUpperCase()
-          )}</strong>
-          <p class="copy">${escapeHtml(issue.message)}</p>
-        </div>
-      `
-    )
-    .join("");
+function renderProfilesTab(game) {
+  return `
+    <div class="list-block">
+      ${
+        game.profiles.length
+          ? game.profiles
+              .map((profile) => {
+                return `
+                  <div class="item-card">
+                    <div class="inline-row">
+                      <strong>${escapeHtml(profile.name || "New profile")}</strong>
+                      <button class="button small ghost" type="button" data-action="delete-profile" data-profile-id="${escapeAttr(
+                        profile.id
+                      )}">Delete</button>
+                    </div>
+                    <div class="field-group">
+                      <label>Name</label>
+                      <input class="field" data-profile-field="name" data-profile-id="${escapeAttr(
+                        profile.id
+                      )}" value="${escapeAttr(profile.name)}" />
+                    </div>
+                    <label class="node-toggle">
+                      <input type="checkbox" data-profile-field="visible" data-profile-id="${escapeAttr(
+                        profile.id
+                      )}" ${profile.visible ? "checked" : ""} />
+                      Show in Play
+                    </label>
+                    <div class="field-group">
+                      <label>Starting State</label>
+                      <select class="field" data-profile-field="startState" data-profile-id="${escapeAttr(profile.id)}">
+                        ${renderStateOptions(profile.states, profile.startState)}
+                      </select>
+                    </div>
+                    <div class="field-group">
+                      <label>States</label>
+                      <div class="stack compact">
+                        ${
+                          profile.states.length
+                            ? profile.states
+                                .map((state) => {
+                                  return `
+                                    <div class="item-card">
+                                      <div class="inline-row">
+                                        <strong>${escapeHtml(state.name || "Unnamed state")}</strong>
+                                        <button class="button small ghost" type="button" data-action="delete-profile-state" data-profile-id="${escapeAttr(
+                                          profile.id
+                                        )}" data-profile-state-id="${escapeAttr(state.id)}">Delete</button>
+                                      </div>
+                                      <div class="field-group">
+                                        <label>State Name</label>
+                                        <input class="field" data-profile-state-field="name" data-profile-id="${escapeAttr(
+                                          profile.id
+                                        )}" data-profile-state-id="${escapeAttr(state.id)}" value="${escapeAttr(state.name)}" />
+                                      </div>
+                                      <div class="item-card">
+                                        <div class="inline-row">
+                                          <strong>Set Variables</strong>
+                                          <button class="button small secondary" type="button" data-action="add-profile-mapping" data-profile-id="${escapeAttr(
+                                            profile.id
+                                          )}" data-profile-state-id="${escapeAttr(state.id)}">Add Set Variable</button>
+                                        </div>
+                                        ${
+                                          state.mappings.length
+                                            ? state.mappings
+                                                .map((mapping) =>
+                                                  renderVariableEffectEditor(game, mapping, {
+                                                    removeAction: "remove-profile-mapping",
+                                                    extraData: {
+                                                      "data-profile-id": profile.id,
+                                                      "data-profile-state-id": state.id,
+                                                    },
+                                                  })
+                                                )
+                                                .join("")
+                                            : '<p class="copy">No set-variable rules.</p>'
+                                        }
+                                      </div>
+                                    </div>
+                                  `;
+                                })
+                                .join("")
+                            : '<div class="paper-note">No states defined yet.</div>'
+                        }
+                      </div>
+                    </div>
+                    <div class="tracker-add-wrap">
+                      <button class="list-add-fab" type="button" data-action="add-profile-state" data-profile-id="${escapeAttr(
+                        profile.id
+                      )}" title="Add state">+</button>
+                    </div>
+                  </div>
+                `;
+              })
+              .join("")
+          : '<div class="paper-note">No profiles defined yet.</div>'
+      }
+    </div>
+    <div class="tracker-add-wrap">
+      <button class="list-add-fab" type="button" data-action="add-profile" title="Add profile">+</button>
+    </div>
+  `;
 }
 
-function renderInspector(game, validation) {
+function renderStringsTab(game) {
+  return `
+    <div class="list-block">
+      ${
+        game.strings.length
+          ? game.strings
+              .map((entry) => {
+                return `
+                  <div class="item-card">
+                    <div class="inline-row">
+                      <strong>${escapeHtml(entry.name || "New string")}</strong>
+                      <button class="button small ghost" type="button" data-action="delete-string" data-string-id="${escapeAttr(
+                        entry.id
+                      )}">Delete</button>
+                    </div>
+                    <div class="field-group">
+                      <label>Name</label>
+                      <input class="field" data-string-field="name" data-string-id="${escapeAttr(entry.id)}" value="${escapeAttr(
+                        entry.name
+                      )}" />
+                    </div>
+                    <div class="field-group">
+                      <label>Start Value</label>
+                      <textarea class="textarea" data-string-field="startValue" data-string-id="${escapeAttr(
+                        entry.id
+                      )}" placeholder="Starting text">${escapeHtml(entry.startValue)}</textarea>
+                    </div>
+                    <p class="copy">Use <code>{{${escapeHtml(
+                      entry.name || "Variable Name"
+                    )}}}</code> in message, info, paragraph, or option text to insert the current value.</p>
+                  </div>
+                `;
+              })
+              .join("")
+          : '<div class="paper-note">No strings defined yet.</div>'
+      }
+    </div>
+    <div class="tracker-add-wrap">
+      <button class="list-add-fab" type="button" data-action="add-string" title="Add string">+</button>
+    </div>
+  `;
+}
+
+function renderInspector(game) {
+  const cluster = appState.selection.clusterId ? getClusterById(game, appState.selection.clusterId) : null;
   const node = appState.selection.nodeId ? getNodeById(game, appState.selection.nodeId) : null;
+  const paragraph = node && appState.selection.paragraphId ? getParagraphById(node, appState.selection.paragraphId) : null;
   const option = node && appState.selection.optionId ? getOptionById(node, appState.selection.optionId) : null;
 
-  if (!node) {
-    refs.editorInspector.innerHTML = `<div class="paper-note">Select a message node to edit its content. Select one of its options to edit transition logic, requirements, and effects.</div>`;
+  if (cluster) {
+    refs.editorInspectorShell.classList.remove("hidden");
+    refs.editorInspector.innerHTML = renderClusterInspector(game, cluster);
     return;
   }
 
-  refs.editorInspector.innerHTML = option
-    ? renderOptionInspector(game, node, option)
-    : renderNodeInspector(game, node, validation);
+  if (!node || (!paragraph && !option)) {
+    refs.editorInspector.innerHTML = "";
+    refs.editorInspectorShell.classList.add("hidden");
+    return;
+  }
+
+  refs.editorInspectorShell.classList.remove("hidden");
+  refs.editorInspector.innerHTML = paragraph
+    ? renderParagraphInspector(game, node, paragraph)
+    : renderOptionInspector(game, node, option);
 }
 
-function renderNodeInspector(game, node, validation) {
-  const chapter = getChapterById(game, node.chapterId);
-  const chapterStart = chapter?.startNodeId === node.id;
-  const isRoot = game.rootNodeId === node.id;
-  const nodeIssues = validation.filter((issue) => issue.targetId === node.id);
-
+function renderClusterInspector(game, cluster) {
   return `
     <div class="form-block">
-      <div class="badge-row">
-        ${isRoot ? '<span class="chip">Game root</span>' : ""}
-        ${chapterStart ? '<span class="chip">Chapter start</span>' : ""}
-        ${node.isEndpoint ? '<span class="chip">Endpoint</span>' : ""}
+      <div class="inline-row">
+        <strong>Cluster</strong>
+        <button class="button small ghost" type="button" data-action="clear-cluster-selection">Close</button>
       </div>
-
       <div class="field-group">
-        <label>Message name</label>
-        <input class="field" data-node-field="name" value="${escapeAttr(node.name)}" />
+        <label>Name</label>
+        <input class="field" data-cluster-field="name" value="${escapeAttr(cluster.name)}" />
       </div>
-
       <div class="field-group">
-        <label>Chapter</label>
-        <select class="field" data-node-field="chapterId">
-          ${game.chapters
-            .map(
-              (chapterOption) =>
-                `<option value="${escapeAttr(chapterOption.id)}" ${
-                  node.chapterId === chapterOption.id ? "selected" : ""
-                }>${escapeHtml(chapterOption.name)}</option>`
-            )
-            .join("")}
+        <label>Target message</label>
+        <select class="field" data-cluster-field="targetNodeId">
+          <option value="">Unassigned</option>
+          ${renderNodeOptions(game, cluster.targetNodeId)}
         </select>
       </div>
+      <div class="item-actions">
+        <button class="button small ghost" type="button" data-action="delete-cluster">Delete Cluster</button>
+      </div>
+    </div>
+  `;
+}
 
-      <div class="field-group">
-        <label>Secondary information</label>
-        <input class="field" data-node-field="secondary" value="${escapeAttr(node.secondary)}" />
+function renderParagraphInspector(game, node, paragraph) {
+  const paragraphIndex = node.paragraphs.findIndex((entry) => entry.id === paragraph.id);
+  return `
+    <div class="form-block">
+      <div class="inline-row">
+        <strong>Paragraph</strong>
+        <button class="button small ghost" type="button" data-action="clear-paragraph-selection">Close</button>
       </div>
 
-      <div class="field-group">
-        <label>Body text</label>
-        <textarea class="textarea" data-node-field="body">${escapeHtml(node.body)}</textarea>
-      </div>
+      <div class="paper-note">${escapeHtml(paragraph.text || "Empty paragraph.")}</div>
 
-      <div class="field-group">
-        <label>Editor notes</label>
-        <textarea class="textarea" data-node-field="editorNotes">${escapeHtml(
-          node.editorNotes
-        )}</textarea>
-      </div>
-
-      <div class="field-group">
-        <label>
-          <input type="checkbox" data-node-field="isEndpoint" ${node.isEndpoint ? "checked" : ""} />
-          Treat as endpoint
-        </label>
+      <div class="item-card">
+        <div class="inline-row">
+          <strong>Variable Checks</strong>
+          <div class="item-actions">
+            <button class="button small secondary" type="button" data-action="add-paragraph-variable-check">Add Check</button>
+          </div>
+        </div>
+        ${
+          paragraph.requirements.length
+            ? paragraph.requirements.map((requirement) => renderRequirementEditor(game, requirement)).join("")
+            : '<p class="copy">No variable checks.</p>'
+        }
       </div>
 
       <div class="item-actions">
-        <button class="button small" type="button" data-action="add-option">Add Option</button>
-        <button class="button small ghost" type="button" data-action="delete-node" ${
-          game.nodes.length === 1 ? "disabled" : ""
-        }>Delete Message</button>
+        <button class="button small ghost" type="button" data-action="move-paragraph-up" ${
+          paragraphIndex <= 0 ? "disabled" : ""
+        }>Move Up</button>
+        <button class="button small ghost" type="button" data-action="move-paragraph-down" ${
+          paragraphIndex >= node.paragraphs.length - 1 ? "disabled" : ""
+        }>Move Down</button>
+        <button class="button small secondary" type="button" data-action="duplicate-paragraph-inline" data-node-id="${escapeAttr(
+          node.id
+        )}" data-paragraph-id="${escapeAttr(paragraph.id)}">Duplicate Paragraph</button>
+        <button class="button small ghost" type="button" data-action="delete-paragraph-inline" data-node-id="${escapeAttr(
+          node.id
+        )}" data-paragraph-id="${escapeAttr(paragraph.id)}" ${node.paragraphs.length === 1 ? "disabled" : ""}>Delete Paragraph</button>
       </div>
-
-      ${
-        nodeIssues.length
-          ? `
-            <div class="item-card">
-              <strong class="status-warn">Node issues</strong>
-              ${nodeIssues.map((issue) => `<p class="copy">${escapeHtml(issue.message)}</p>`).join("")}
-            </div>
-          `
-          : ""
-      }
     </div>
   `;
 }
 
 function renderOptionInspector(game, node, option) {
+  const optionIndex = node.options.findIndex((entry) => entry.id === option.id);
   return `
     <div class="form-block">
       <div class="inline-row">
-        <strong>${escapeHtml(node.name)}</strong>
-        <button class="button small ghost" type="button" data-action="clear-option-selection">Back to Message</button>
-      </div>
-
-      <div class="field-group">
-        <label>Option text</label>
-        <textarea class="textarea" data-option-field="text">${escapeHtml(option.text)}</textarea>
+        <strong>${escapeHtml(option.text || "Untitled option")}</strong>
+        <button class="button small ghost" type="button" data-action="clear-option-selection">Close</button>
       </div>
 
       <div class="field-group">
@@ -957,7 +1164,7 @@ function renderOptionInspector(game, node, option) {
       }
 
       <div class="field-group">
-        <label>Failed requirements behavior</label>
+        <label>Failed Variable Check Behavior</label>
         <select class="field" data-option-field="failureMode">
           ${FAILURE_OPTIONS.map(
             (failure) =>
@@ -969,7 +1176,7 @@ function renderOptionInspector(game, node, option) {
       </div>
 
       <div class="field-group">
-        <label>Requirement display</label>
+        <label>Variable Check Display</label>
         <select class="field" data-option-field="requirementDisplayMode">
           ${DISPLAY_OPTIONS.map(
             (display) =>
@@ -984,7 +1191,7 @@ function renderOptionInspector(game, node, option) {
         option.requirementDisplayMode === "custom"
           ? `
             <div class="field-group">
-              <label>Custom requirement text</label>
+              <label>Custom Variable Check Text</label>
               <input class="field" data-option-field="requirementDisplayText" value="${escapeAttr(
                 option.requirementDisplayText
               )}" />
@@ -994,7 +1201,7 @@ function renderOptionInspector(game, node, option) {
       }
 
       <div class="field-group">
-        <label>Effect display</label>
+        <label>Set Variable Display</label>
         <select class="field" data-option-field="effectDisplayMode">
           ${DISPLAY_OPTIONS.map(
             (display) =>
@@ -1009,7 +1216,7 @@ function renderOptionInspector(game, node, option) {
         option.effectDisplayMode === "custom"
           ? `
             <div class="field-group">
-              <label>Custom effect text</label>
+              <label>Custom Set Variable Text</label>
               <input class="field" data-option-field="effectDisplayText" value="${escapeAttr(
                 option.effectDisplayText
               )}" />
@@ -1020,44 +1227,37 @@ function renderOptionInspector(game, node, option) {
 
       <div class="item-card">
         <div class="inline-row">
-          <strong>Requirements</strong>
+          <strong>Variable Checks</strong>
           <div class="item-actions">
-            <button class="button small secondary" type="button" data-action="add-tracker-requirement">+ Tracker</button>
-            <button class="button small secondary" type="button" data-action="add-flag-requirement">+ Flag</button>
+            <button class="button small secondary" type="button" data-action="add-variable-check">Add Check</button>
           </div>
         </div>
         ${
           option.requirements.length
             ? option.requirements.map((requirement) => renderRequirementEditor(game, requirement)).join("")
-            : '<p class="copy">No requirements.</p>'
+            : '<p class="copy">No variable checks.</p>'
         }
       </div>
 
       <div class="item-card">
         <div class="inline-row">
-          <strong>Tracker effects</strong>
-          <button class="button small secondary" type="button" data-action="add-tracker-effect">Add effect</button>
+          <strong>Set Variables</strong>
+          <button class="button small secondary" type="button" data-action="add-variable-effect">Add Set Variable</button>
         </div>
         ${
-          option.trackerEffects.length
-            ? option.trackerEffects.map((effect) => renderTrackerEffectEditor(game, effect)).join("")
-            : '<p class="copy">No tracker effects.</p>'
-        }
-      </div>
-
-      <div class="item-card">
-        <div class="inline-row">
-          <strong>Flag effects</strong>
-          <button class="button small secondary" type="button" data-action="add-flag-effect">Add effect</button>
-        </div>
-        ${
-          option.flagEffects.length
-            ? option.flagEffects.map((effect) => renderFlagEffectEditor(game, effect)).join("")
-            : '<p class="copy">No flag effects.</p>'
+          option.variableEffects.length
+            ? option.variableEffects.map((effect) => renderVariableEffectEditor(game, effect)).join("")
+            : '<p class="copy">No set-variable rules.</p>'
         }
       </div>
 
       <div class="item-actions">
+        <button class="button small ghost" type="button" data-action="move-option-up" ${
+          optionIndex <= 0 ? "disabled" : ""
+        }>Move Up</button>
+        <button class="button small ghost" type="button" data-action="move-option-down" ${
+          optionIndex >= node.options.length - 1 ? "disabled" : ""
+        }>Move Down</button>
         <button class="button small ghost" type="button" data-action="delete-option">Delete Option</button>
       </div>
     </div>
@@ -1065,88 +1265,82 @@ function renderOptionInspector(game, node, option) {
 }
 
 function renderRequirementEditor(game, requirement) {
-  if (requirement.kind === "tracker") {
-    return `
-      <div class="item-card">
-        <div class="inline-form">
-          <div class="field-group">
-            <label>Tracker</label>
-            <select class="field" data-requirement-id="${escapeAttr(requirement.id)}" data-requirement-field="targetId">
-              ${game.trackers
-                .map(
-                  (tracker) =>
-                    `<option value="${escapeAttr(tracker.id)}" ${
-                      requirement.targetId === tracker.id ? "selected" : ""
-                    }>${escapeHtml(tracker.name)}</option>`
-                )
-                .join("")}
-            </select>
-          </div>
-          <div class="field-group">
-            <label>Operator</label>
-            <select class="field" data-requirement-id="${escapeAttr(requirement.id)}" data-requirement-field="operator">
-              ${TRACKER_OPERATORS.map(
-                (operator) =>
-                  `<option value="${operator}" ${
-                    requirement.operator === operator ? "selected" : ""
-                  }>${escapeHtml(operator)}</option>`
-              ).join("")}
-            </select>
-          </div>
-        </div>
-        <div class="inline-form">
-          <div class="field-group">
-            <label>Value</label>
-            <input class="field" type="number" data-requirement-id="${escapeAttr(
-              requirement.id
-            )}" data-requirement-field="value" value="${escapeAttr(String(requirement.value))}" />
-          </div>
-          <div class="field-group">
-            <label>Type</label>
-            <select class="field" data-requirement-id="${escapeAttr(requirement.id)}" data-requirement-field="kind">
-              <option value="tracker" selected>Tracker</option>
-              <option value="flag">Flag</option>
-            </select>
-          </div>
-        </div>
-        <div class="item-actions">
-          <button class="button small ghost" type="button" data-action="remove-requirement" data-requirement-id="${escapeAttr(
-            requirement.id
-          )}">Remove</button>
-        </div>
-      </div>
-    `;
-  }
+  const isInteger = requirement.kind === "tracker";
+  const valueControl = isInteger
+    ? `<input class="field" type="number" data-requirement-id="${escapeAttr(
+        requirement.id
+      )}" data-requirement-field="value" value="${escapeAttr(String(requirement.value))}" />`
+    : `<select class="field" data-requirement-id="${escapeAttr(
+        requirement.id
+      )}" data-requirement-field="state">${renderStatefulRequirementOptions(
+        game,
+        requirement.kind,
+        requirement.targetId,
+        requirement.state
+      )}</select>`;
+  const variableOptions = isInteger
+    ? game.trackers
+        .map(
+          (tracker) =>
+            `<option value="${escapeAttr(tracker.id)}" ${
+              requirement.targetId === tracker.id ? "selected" : ""
+            }>${escapeHtml(tracker.name)}</option>`
+        )
+        .join("")
+    : getVariableOptions(game, requirement.kind, requirement.targetId);
 
   return `
     <div class="item-card">
       <div class="inline-form">
         <div class="field-group">
-          <label>Flag</label>
-          <select class="field" data-requirement-id="${escapeAttr(requirement.id)}" data-requirement-field="targetId">
-            ${game.flags
-              .map(
-                (flag) =>
-                  `<option value="${escapeAttr(flag.id)}" ${
-                    requirement.targetId === flag.id ? "selected" : ""
-                  }>${escapeHtml(flag.name)}</option>`
-              )
-              .join("")}
+          <label>Variable Type</label>
+          <select class="field" data-requirement-id="${escapeAttr(requirement.id)}" data-requirement-field="kind">
+            <option value="tracker" ${requirement.kind === "tracker" ? "selected" : ""}>Integer</option>
+            <option value="flag" ${requirement.kind === "flag" ? "selected" : ""}>Enum</option>
+            <option value="profile" ${requirement.kind === "profile" ? "selected" : ""}>Profile</option>
           </select>
         </div>
         <div class="field-group">
-          <label>Required state</label>
-          <select class="field" data-requirement-id="${escapeAttr(requirement.id)}" data-requirement-field="state">
-            ${renderFlagStateOptions(game, requirement.targetId, requirement.state)}
+          <label>Variable</label>
+          <select class="field" data-requirement-id="${escapeAttr(requirement.id)}" data-requirement-field="targetId">
+            ${variableOptions}
           </select>
         </div>
       </div>
-      <div class="field-group">
-        <label>Type</label>
-        <select class="field" data-requirement-id="${escapeAttr(requirement.id)}" data-requirement-field="kind">
-          <option value="tracker">Tracker</option>
-          <option value="flag" selected>Flag</option>
-        </select>
+      <div class="inline-form">
+        <div class="field-group">
+          <label>Operator</label>
+          <select class="field" data-requirement-id="${escapeAttr(requirement.id)}" data-requirement-field="operator">
+            ${
+              isInteger
+                ? TRACKER_OPERATORS.map(
+                    (operator) =>
+                      `<option value="${operator}" ${
+                        requirement.operator === operator ? "selected" : ""
+                      }>${escapeHtml(operator)}</option>`
+                  ).join("")
+                : `<option value="=" ${requirement.operator === "=" ? "selected" : ""}>=</option>
+                   <option value="!=" ${requirement.operator === "!=" ? "selected" : ""}>!=</option>`
+            }
+          </select>
+        </div>
+        <div class="field-group">
+          <label>Value</label>
+          ${valueControl}
+        </div>
+      </div>
+      <div class="inline-form">
+        <div class="field-group">
+          <label>Logic</label>
+          <select class="field" data-requirement-id="${escapeAttr(requirement.id)}" data-requirement-field="joinMode">
+            ${REQUIREMENT_JOIN_OPTIONS.map(
+              (mode) =>
+                `<option value="${escapeAttr(mode.value)}" ${
+                  requirement.joinMode === mode.value ? "selected" : ""
+                }>${escapeHtml(mode.label)}</option>`
+            ).join("")}
+          </select>
+        </div>
       </div>
       <div class="item-actions">
         <button class="button small ghost" type="button" data-action="remove-requirement" data-requirement-id="${escapeAttr(
@@ -1157,70 +1351,103 @@ function renderRequirementEditor(game, requirement) {
   `;
 }
 
-function renderTrackerEffectEditor(game, effect) {
+function renderVariableEffectEditor(game, effect, context = {}) {
+  const removeAction = context.removeAction || "remove-variable-effect";
+  const extraData = buildDataAttributes(context.extraData);
+  const actionOptions =
+    effect.variableType === "tracker"
+      ? `
+          <option value="set" ${effect.action === "set" ? "selected" : ""}>set</option>
+          <option value="increase" ${effect.action === "increase" ? "selected" : ""}>increase</option>
+          <option value="decrease" ${effect.action === "decrease" ? "selected" : ""}>decrease</option>
+        `
+      : `<option value="set" selected>set</option>`;
+  const valueControl =
+    effect.variableType === "flag"
+      ? `
+          <select class="field" data-variable-effect-id="${escapeAttr(effect.id)}" data-variable-effect-field="value" ${extraData}>
+            ${renderStatefulRequirementOptions(game, "flag", effect.variableId, effect.value)}
+          </select>
+        `
+      : effect.variableType === "profile"
+        ? `
+          <select class="field" data-variable-effect-id="${escapeAttr(effect.id)}" data-variable-effect-field="value" ${extraData}>
+            ${renderStatefulRequirementOptions(game, "profile", effect.variableId, effect.value)}
+          </select>
+        `
+      : effect.variableType === "string"
+        ? `<input class="field" data-variable-effect-id="${escapeAttr(effect.id)}" data-variable-effect-field="value" ${extraData} value="${escapeAttr(
+            effect.value ?? ""
+          )}" />`
+        : `<input class="field" type="number" data-variable-effect-id="${escapeAttr(effect.id)}" data-variable-effect-field="value" ${extraData} value="${escapeAttr(
+            String(effect.value ?? 0)
+          )}" />`;
   return `
     <div class="item-card">
       <div class="inline-form">
         <div class="field-group">
-          <label>Tracker</label>
-          <select class="field" data-tracker-effect-id="${escapeAttr(effect.id)}" data-tracker-effect-field="trackerId">
-            ${game.trackers
-              .map(
-                (tracker) =>
-                  `<option value="${escapeAttr(tracker.id)}" ${
-                    effect.trackerId === tracker.id ? "selected" : ""
-                  }>${escapeHtml(tracker.name)}</option>`
-              )
-              .join("")}
+          <label>Action</label>
+          <select class="field" data-variable-effect-id="${escapeAttr(effect.id)}" data-variable-effect-field="action" ${extraData}>
+            ${actionOptions}
           </select>
         </div>
         <div class="field-group">
-          <label>Delta</label>
-          <input class="field" type="number" data-tracker-effect-id="${escapeAttr(
-            effect.id
-          )}" data-tracker-effect-field="delta" value="${escapeAttr(String(effect.delta))}" />
+          <label>Variable Type</label>
+          <select class="field" data-variable-effect-id="${escapeAttr(effect.id)}" data-variable-effect-field="variableType" ${extraData}>
+            <option value="tracker" ${effect.variableType === "tracker" ? "selected" : ""}>Integer</option>
+            <option value="flag" ${effect.variableType === "flag" ? "selected" : ""}>Enum</option>
+            <option value="profile" ${effect.variableType === "profile" ? "selected" : ""}>Profile</option>
+            <option value="string" ${effect.variableType === "string" ? "selected" : ""}>String</option>
+          </select>
+        </div>
+      </div>
+      <div class="inline-form">
+        <div class="field-group">
+          <label>Variable</label>
+          <select class="field" data-variable-effect-id="${escapeAttr(effect.id)}" data-variable-effect-field="variableId" ${extraData}>
+            ${getVariableOptions(game, effect.variableType, effect.variableId)}
+          </select>
+        </div>
+        <div class="field-group">
+          <label>Value</label>
+          ${valueControl}
         </div>
       </div>
       <div class="item-actions">
-        <button class="button small ghost" type="button" data-action="remove-tracker-effect" data-tracker-effect-id="${escapeAttr(
+        <button class="button small ghost" type="button" data-action="${escapeAttr(removeAction)}" data-variable-effect-id="${escapeAttr(
           effect.id
-        )}">Remove</button>
+        )}" ${extraData}>Remove</button>
       </div>
     </div>
   `;
 }
 
-function renderFlagEffectEditor(game, effect) {
-  return `
-    <div class="item-card">
-      <div class="inline-form">
-        <div class="field-group">
-          <label>Flag</label>
-          <select class="field" data-flag-effect-id="${escapeAttr(effect.id)}" data-flag-effect-field="flagId">
-            ${game.flags
-              .map(
-                (flag) =>
-                  `<option value="${escapeAttr(flag.id)}" ${
-                    effect.flagId === flag.id ? "selected" : ""
-                  }>${escapeHtml(flag.name)}</option>`
-              )
-              .join("")}
-          </select>
-        </div>
-        <div class="field-group">
-          <label>New state</label>
-          <select class="field" data-flag-effect-id="${escapeAttr(effect.id)}" data-flag-effect-field="state">
-            ${renderFlagStateOptions(game, effect.flagId, effect.state)}
-          </select>
-        </div>
-      </div>
-      <div class="item-actions">
-        <button class="button small ghost" type="button" data-action="remove-flag-effect" data-flag-effect-id="${escapeAttr(
-          effect.id
-        )}">Remove</button>
-      </div>
-    </div>
-  `;
+function getVariableOptions(game, variableType, selectedId) {
+  const source =
+    variableType === "flag"
+      ? game.flags
+      : variableType === "profile"
+        ? game.profiles
+      : variableType === "string"
+        ? game.strings
+        : game.trackers;
+
+  return source
+    .map(
+      (entry) =>
+        `<option value="${escapeAttr(entry.id)}" ${selectedId === entry.id ? "selected" : ""}>${escapeHtml(
+          entry.name
+        )}</option>`
+    )
+    .join("");
+}
+
+function renderStatefulRequirementOptions(game, kind, variableId, selectedState) {
+  if (kind === "profile") {
+    const profile = getProfileById(game, variableId);
+    return renderStateOptions(profile?.states || [], selectedState);
+  }
+  return renderFlagStateOptions(game, variableId, selectedState);
 }
 
 function renderNodeOptions(game, selectedNodeId, chapterFilterId = null) {
@@ -1250,91 +1477,570 @@ function renderFlagStateOptions(game, flagId, selectedState) {
     .join("");
 }
 
+function renderStateOptions(states, selectedState) {
+  return [null, ...states]
+    .map((stateEntry) => {
+      const state = typeof stateEntry === "string" ? stateEntry : stateEntry?.name ?? null;
+      const value = state === null ? "__NULL__" : state;
+      const label = state === null ? "null" : state;
+      return `<option value="${escapeAttr(value)}" ${
+        selectedState === state ? "selected" : ""
+      }>${escapeHtml(label)}</option>`;
+    })
+    .join("");
+}
+
+function buildDataAttributes(attributes = {}) {
+  return Object.entries(attributes)
+    .map(([key, value]) => `${key}="${escapeAttr(String(value))}"`)
+    .join(" ");
+}
+
+function renderLocationOptions(game, selectedLocation) {
+  const locations = Array.from(new Set([...(game.world?.locations || []), selectedLocation || ""])).filter(Boolean);
+  return locations
+    .map(
+      (location) =>
+        `<option value="${escapeAttr(location)}" ${
+          selectedLocation === location ? "selected" : ""
+        }>${escapeHtml(location)}</option>`
+    )
+    .join("");
+}
+
 function renderGraph(game) {
   refs.graphZoomLabel.textContent = `${Math.round(appState.graph.zoom * 100)}%`;
   applyGraphTransform();
 
-  if (!game.nodes.length) {
+  if (!game.nodes.length && !game.clusters.length) {
     refs.graphNodes.innerHTML = `<div class="empty-graph">Add a message node to begin authoring.</div>`;
     refs.graphConnections.innerHTML = "";
     return;
   }
 
-  refs.graphNodes.innerHTML = game.nodes
-    .map((node) => {
-      const selectedNode = appState.selection.nodeId === node.id;
-      const chapter = getChapterById(game, node.chapterId);
-      const optionRows = node.options.length
-        ? node.options
-            .map((option) => {
-              const selectedOption = selectedNode && appState.selection.optionId === option.id;
-              const targetLabel =
-                option.terminal === "target"
-                  ? getNodeById(game, option.targetNodeId)?.name || "Unassigned target"
-                  : formatTerminalLabel(option.terminal);
-
-              return `
-                <button
-                  class="node-option ${selectedOption ? "selected" : ""}"
-                  type="button"
-                  data-node-id="${escapeAttr(node.id)}"
-                  data-option-id="${escapeAttr(option.id)}"
-                >
-                  ${escapeHtml(option.text || "Untitled option")}
-                  <small>${escapeHtml(targetLabel)}</small>
-                </button>
-              `;
-            })
-            .join("")
-        : `<div class="node-option"><strong>No options yet.</strong><small>Add one from the inspector.</small></div>`;
-
-      return `
-        <article
-          class="graph-node ${selectedNode ? "selected" : ""}"
-          data-node-id="${escapeAttr(node.id)}"
-          style="transform: translate(${node.position.x}px, ${node.position.y}px);"
-        >
-          <div class="node-header" data-node-id="${escapeAttr(node.id)}">
-            <p class="eyebrow">${escapeHtml(chapter?.name || "Unassigned chapter")}</p>
-            <h3>${escapeHtml(node.name || "Untitled message")}</h3>
-            <p class="node-meta">${escapeHtml(node.secondary || "No secondary information")}</p>
-          </div>
-          <div class="node-options">${optionRows}</div>
-        </article>
-      `;
-    })
+  refs.graphNodes.innerHTML = [...game.clusters.map((cluster) => renderGraphCluster(game, cluster)), ...game.nodes.map((node) => renderGraphNode(game, node))]
     .join("");
 
   refs.graphConnections.innerHTML = buildConnectionPaths(game);
 }
 
+function renderGraphCluster(game, cluster) {
+  const selectedCluster = appState.selection.clusterId === cluster.id;
+  const targetNode = cluster.targetNodeId ? getNodeById(game, cluster.targetNodeId) : null;
+
+  return `
+    <article
+      class="graph-cluster ${selectedCluster ? "selected" : ""}"
+      data-cluster-id="${escapeAttr(cluster.id)}"
+      style="transform: translate(${cluster.position.x}px, ${cluster.position.y}px); z-index: ${selectedCluster ? 4 : 1};"
+    >
+      <button class="cluster-handle cluster-handle-in" type="button" data-cluster-inlet-id="${escapeAttr(
+        cluster.id
+      )}" data-connect-target-cluster-id="${escapeAttr(cluster.id)}" title="Connect into cluster"></button>
+      <div class="cluster-shell" data-drag-cluster-id="${escapeAttr(cluster.id)}">
+        <p class="cluster-label">${escapeHtml(cluster.name || "Cluster")}</p>
+        <p class="cluster-target">${escapeHtml(targetNode?.name || "No target message")}</p>
+      </div>
+      <button class="cluster-handle cluster-handle-out" type="button" data-connect-cluster-id="${escapeAttr(
+        cluster.id
+      )}" title="Connect cluster to message"></button>
+    </article>
+  `;
+}
+
+function renderGraphNode(game, node) {
+  const selectedNode = appState.selection.nodeId === node.id;
+  const menuOpen = appState.selection.nodeMenuId === node.id;
+  const chapter = getChapterById(game, node.chapterId);
+
+  return `
+    <article
+      class="graph-node ${selectedNode ? "selected" : ""}"
+      data-node-id="${escapeAttr(node.id)}"
+      style="transform: translate(${node.position.x}px, ${node.position.y}px); z-index: ${selectedNode ? 4 : 1};"
+    >
+      <span class="node-inlet" data-node-inlet-id="${escapeAttr(node.id)}" data-connect-target-node-id="${escapeAttr(
+        node.id
+      )}"></span>
+      <div class="node-shell">
+        <div class="node-topline" data-drag-node-id="${escapeAttr(node.id)}">
+          <div>
+            <p class="eyebrow">${escapeHtml(chapter?.name || "No chapter")}</p>
+            <h3>${escapeHtml(node.name || "Untitled message")}</h3>
+          </div>
+          <div class="menu-wrap">
+            <button class="button small ghost menu-button node-menu-button" type="button" data-action="toggle-node-menu" data-node-id="${escapeAttr(
+              node.id
+            )}">···</button>
+            ${
+              menuOpen
+                ? `
+                    <div class="popover-menu">
+                      <button class="popover-item" type="button" data-action="duplicate-node-inline" data-node-id="${escapeAttr(
+                        node.id
+                      )}">Duplicate</button>
+                      <button class="popover-item" type="button" data-action="add-option-inline" data-node-id="${escapeAttr(
+                        node.id
+                      )}">Add option</button>
+                      <button class="popover-item" type="button" data-action="delete-node-inline" data-node-id="${escapeAttr(
+                        node.id
+                      )}" ${game.nodes.length === 1 ? "disabled" : ""}>Delete</button>
+                    </div>
+                  `
+                : ""
+            }
+          </div>
+        </div>
+        ${renderNodeInlineEditor(game, node)}
+      </div>
+    </article>
+  `;
+}
+
+function renderNodeReadOnlyBody(game, node) {
+  const groupedOptions = groupNodeOptionsByParagraph(node);
+  const secondaryLine = buildNodeSecondaryLine(game, node);
+
+  return `
+    <div class="node-readonly">
+      ${secondaryLine ? `<p class="node-summary-secondary">${escapeHtml(secondaryLine)}</p>` : ""}
+      <div class="node-block-list">
+        ${node.paragraphs
+          .map((paragraph) =>
+            renderNodeParagraphReadOnlyRow(game, node, paragraph, groupedOptions.byParagraph.get(paragraph.id) || [])
+          )
+          .join("")}
+        ${
+          groupedOptions.ungrouped.length
+            ? `
+                <div class="node-options">
+                  ${groupedOptions.ungrouped.map((option) => renderNodeOptionRow(game, node, option)).join("")}
+                </div>
+              `
+            : ""
+        }
+      </div>
+    </div>
+  `;
+}
+
+function renderNodeInlineEditor(game, node) {
+  const groupedOptions = groupNodeOptionsByParagraph(node);
+  return `
+    <div class="node-edit-grid">
+      <label class="node-toggle">
+        <input type="checkbox" data-node-id="${escapeAttr(node.id)}" data-node-field="isEndpoint" ${
+          node.isEndpoint ? "checked" : ""
+        } />
+        Endpoint
+      </label>
+      <div class="field-group">
+        <label>Title</label>
+        <input class="field" data-node-id="${escapeAttr(node.id)}" data-node-field="name" value="${escapeAttr(
+          node.name
+        )}" />
+      </div>
+      <div class="field-group">
+        <label>Info text</label>
+        <input class="field" data-node-id="${escapeAttr(node.id)}" data-node-field="secondary" value="${escapeAttr(
+          node.secondary
+        )}" />
+      </div>
+      <div class="inline-form">
+        <div class="field-group">
+          <label>Time</label>
+          <input class="field" type="time" data-node-id="${escapeAttr(node.id)}" data-node-field="time" value="${escapeAttr(
+            node.time || ""
+          )}" />
+        </div>
+        <div class="field-group">
+          <label>Location</label>
+          <select class="field" data-node-id="${escapeAttr(node.id)}" data-node-field="location">
+            <option value="">Unassigned</option>
+            ${renderLocationOptions(game, node.location)}
+          </select>
+        </div>
+      </div>
+      <div class="field-group">
+        <label>Chapter</label>
+        <select class="field" data-node-id="${escapeAttr(node.id)}" data-node-field="chapterId">
+          ${game.chapters
+            .map(
+              (chapter) =>
+                `<option value="${escapeAttr(chapter.id)}" ${
+                  node.chapterId === chapter.id ? "selected" : ""
+                }>${escapeHtml(chapter.name)}</option>`
+            )
+            .join("")}
+        </select>
+      </div>
+      <div class="field-group">
+        <label>Paragraphs</label>
+        <div class="node-block-list">
+          ${node.paragraphs
+            .map((paragraph) =>
+              renderNodeParagraphRow(game, node, paragraph, groupedOptions.byParagraph.get(paragraph.id) || [])
+            )
+            .join("")}
+          <div class="node-option-add">
+            <button class="list-add-fab node-add-fab" type="button" data-action="add-paragraph-inline" data-node-id="${escapeAttr(
+              node.id
+            )}" title="Add paragraph">+</button>
+          </div>
+          ${
+            groupedOptions.ungrouped.length
+              ? `
+                  <div class="node-options">
+                    ${groupedOptions.ungrouped.map((option) => renderNodeOptionRow(game, node, option)).join("")}
+                  </div>
+                `
+              : '<div class="node-option"><div class="node-option-meta"><strong>No trailing options.</strong><small>Options with matching variable checks appear under their paragraph.</small></div></div>'
+          }
+          <div class="node-option-add">
+            <button class="list-add-fab node-add-fab" type="button" data-action="add-option-inline" data-node-id="${escapeAttr(
+              node.id
+            )}" title="Add option">+</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderNodeParagraphReadOnlyRow(game, node, paragraph, attachedOptions) {
+  const hasText = paragraph.text.trim().length > 0;
+
+  return `
+    <div class="node-paragraph node-paragraph-readonly" data-node-id="${escapeAttr(node.id)}" data-paragraph-id="${escapeAttr(
+      paragraph.id
+    )}">
+      <div class="node-block-head">
+        <div class="node-rule-icons">
+          ${renderRequirementIcons(paragraph.requirements, "paragraph")}
+        </div>
+      </div>
+      ${
+        hasText
+          ? `<p class="node-paragraph-copy">${escapeHtml(paragraph.text)}</p>`
+          : `<p class="node-paragraph-copy node-paragraph-copy-empty">No text yet.</p>`
+      }
+      ${
+        attachedOptions.length
+          ? `<div class="node-paragraph-options">${attachedOptions
+              .map((option) => renderNodeOptionRow(game, node, option))
+              .join("")}</div>`
+          : ""
+      }
+    </div>
+  `;
+}
+
+function renderNodeParagraphRow(game, node, paragraph, attachedOptions) {
+  const selectedParagraph = appState.selection.nodeId === node.id && appState.selection.paragraphId === paragraph.id;
+  const menuKey = buildParagraphMenuKey(node.id, paragraph.id);
+  const menuOpen = appState.selection.paragraphMenuId === menuKey;
+  const paragraphIndex = node.paragraphs.findIndex((entry) => entry.id === paragraph.id);
+
+  return `
+    <div class="node-paragraph ${selectedParagraph ? "selected" : ""}" data-node-id="${escapeAttr(
+      node.id
+    )}" data-paragraph-id="${escapeAttr(paragraph.id)}">
+      <div class="node-block-head">
+        <div class="node-rule-icons">
+          ${renderRequirementIcons(paragraph.requirements, "paragraph")}
+        </div>
+        <div class="menu-wrap">
+          <button class="button small ghost menu-button node-menu-button" type="button" data-action="toggle-paragraph-menu" data-node-id="${escapeAttr(
+            node.id
+          )}" data-paragraph-id="${escapeAttr(paragraph.id)}">···</button>
+          ${
+            menuOpen
+              ? `
+                  <div class="popover-menu">
+                    <button class="popover-item" type="button" data-action="edit-paragraph-settings" data-node-id="${escapeAttr(
+                      node.id
+                    )}" data-paragraph-id="${escapeAttr(paragraph.id)}">Edit settings</button>
+                    <button class="popover-item" type="button" data-action="move-paragraph-up" data-node-id="${escapeAttr(
+                      node.id
+                    )}" data-paragraph-id="${escapeAttr(paragraph.id)}" ${paragraphIndex <= 0 ? "disabled" : ""}>Move up</button>
+                    <button class="popover-item" type="button" data-action="move-paragraph-down" data-node-id="${escapeAttr(
+                      node.id
+                    )}" data-paragraph-id="${escapeAttr(paragraph.id)}" ${
+                      paragraphIndex >= node.paragraphs.length - 1 ? "disabled" : ""
+                    }>Move down</button>
+                    <button class="popover-item" type="button" data-action="duplicate-paragraph-inline" data-node-id="${escapeAttr(
+                      node.id
+                    )}" data-paragraph-id="${escapeAttr(paragraph.id)}">Duplicate</button>
+                    <button class="popover-item" type="button" data-action="delete-paragraph-inline" data-node-id="${escapeAttr(
+                      node.id
+                    )}" data-paragraph-id="${escapeAttr(paragraph.id)}" ${
+                      node.paragraphs.length === 1 ? "disabled" : ""
+                    }>Delete</button>
+                  </div>
+                `
+              : ""
+          }
+        </div>
+      </div>
+      <textarea class="textarea node-paragraph-text" data-node-id="${escapeAttr(node.id)}" data-paragraph-id="${escapeAttr(
+        paragraph.id
+      )}" data-paragraph-field="text">${escapeHtml(paragraph.text)}</textarea>
+      ${
+        attachedOptions.length
+          ? `<div class="node-paragraph-options">${attachedOptions
+              .map((option) => renderNodeOptionRow(game, node, option))
+              .join("")}</div>`
+          : ""
+      }
+    </div>
+  `;
+}
+
+function renderNodeOptionRow(game, node, option) {
+  const selectedOption = appState.selection.nodeId === node.id && appState.selection.optionId === option.id;
+  const cluster = option.targetClusterId ? getClusterById(game, option.targetClusterId) : null;
+  const targetNodeId = resolveOptionTargetNodeId(game, option);
+  const targetLabel =
+    option.terminal === "target"
+      ? cluster
+        ? `${cluster.name || "Cluster"} -> ${getNodeById(game, targetNodeId)?.name || "Unassigned"}`
+        : getNodeById(game, targetNodeId)?.name || "Drag to connect"
+      : formatTerminalLabel(option.terminal);
+
+  return `
+    <div class="node-option ${selectedOption ? "selected" : ""}" data-node-id="${escapeAttr(node.id)}" data-option-id="${escapeAttr(
+      option.id
+    )}">
+      <div class="node-block-head">
+        <div class="node-rule-icons">
+          ${renderRequirementIcons(option.requirements, "option", option.failureMode)}
+        </div>
+      </div>
+      <div class="node-option-meta">
+        ${
+          appState.selection.nodeId === node.id
+            ? `<textarea class="node-option-text" data-node-id="${escapeAttr(node.id)}" data-option-id="${escapeAttr(
+                option.id
+              )}" data-option-field="text">${escapeHtml(option.text)}</textarea>`
+            : `<strong>${escapeHtml(option.text || "Untitled option")}</strong>`
+        }
+        <small>${escapeHtml(targetLabel)}</small>
+      </div>
+      <div class="node-option-actions">
+        <button class="option-handle" type="button" data-connect-option-id="${escapeAttr(
+          option.id
+        )}" data-node-id="${escapeAttr(node.id)}" title="Connect option"></button>
+      </div>
+    </div>
+  `;
+}
+
+function renderRequirementIcons(requirements, kind, failureMode = "disabled") {
+  const hasRequirements = requirements.length > 0;
+  const hasTracker = requirements.some((requirement) => requirement.kind === "tracker");
+  const hasFlag = requirements.some((requirement) => requirement.kind === "flag");
+  const hasProfile = requirements.some((requirement) => requirement.kind === "profile");
+  const parts = [
+    renderRuleIcon("tracker", hasTracker),
+    renderRuleIcon("flag", hasFlag),
+    renderRuleIcon("profile", hasProfile),
+  ];
+
+  if (kind === "option") {
+    parts.push(renderRuleIcon("hidden", hasRequirements && failureMode === "hidden"));
+    parts.push(renderRuleIcon("disabled", hasRequirements && failureMode === "disabled"));
+  }
+
+  return parts.join("");
+}
+
+function renderRuleIcon(kind, active) {
+  const labels = {
+    tracker: "Checks integer",
+    flag: "Checks enum",
+    profile: "Checks profile",
+    hidden: "Hidden when unmet",
+    disabled: "Disabled when unmet",
+  };
+  return `
+    <span class="rule-icon ${active ? "active" : "inactive"}" title="${escapeAttr(labels[kind])}">
+      ${renderRuleIconSvg(kind)}
+    </span>
+  `;
+}
+
+function renderRuleIconSvg(kind) {
+  switch (kind) {
+    case "tracker":
+      return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12V8M8 12V4M13 12V6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.4"/></svg>';
+    case "flag":
+      return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 13V3M4 3h6l-1.5 2L10 7H4" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.4"/></svg>';
+    case "profile":
+      return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 5.5h5v5h-5zM7.5 3.5h5v5h-5z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.2"/></svg>';
+    case "hidden":
+      return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.4 8c1.3-2.1 3.2-3.1 5.6-3.1 2.4 0 4.3 1 5.6 3.1-1.3 2.1-3.2 3.1-5.6 3.1-2.4 0-4.3-1-5.6-3.1Zm0 0 11.2 0M5 11l6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2"/></svg>';
+    case "disabled":
+      return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.2 7V5.6A2.8 2.8 0 0 1 8 2.8a2.8 2.8 0 0 1 2.8 2.8V7M4.2 7h7.6v6H4.2z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.2"/></svg>';
+    default:
+      return "";
+  }
+}
+
+function groupNodeOptionsByParagraph(node) {
+  const byParagraph = new Map();
+  const usedOptionIds = new Set();
+
+  node.paragraphs.forEach((paragraph) => {
+    if (!paragraph.requirements.length) {
+      byParagraph.set(paragraph.id, []);
+      return;
+    }
+
+    const signature = getRequirementSignature(paragraph.requirements);
+    const matches = node.options.filter(
+      (option) => !usedOptionIds.has(option.id) && getRequirementSignature(option.requirements) === signature
+    );
+    matches.forEach((option) => usedOptionIds.add(option.id));
+    byParagraph.set(paragraph.id, matches);
+  });
+
+  return {
+    byParagraph,
+    ungrouped: node.options.filter((option) => !usedOptionIds.has(option.id)),
+  };
+}
+
+function getRequirementSignature(requirements) {
+  return JSON.stringify(
+    requirements.map((requirement) => ({
+      kind: requirement.kind,
+      joinMode: requirement.joinMode,
+      targetId: requirement.targetId,
+      operator: requirement.operator,
+      value: requirement.value,
+      state: requirement.state,
+    }))
+  );
+}
+
+function getNodeEditorBody(node) {
+  return node.paragraphs.map((paragraph) => paragraph.text).filter(Boolean).join("\n\n");
+}
+
+function getNodeRuntimeBody(game, playState, node) {
+  return node.paragraphs
+    .filter((paragraph) => evaluateParagraphVisibility(game, playState, paragraph))
+    .map((paragraph) => paragraph.text)
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function interpolateText(game, playState, text) {
+  return String(text || "").replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_match, token) => {
+    const key = String(token || "").trim();
+    if (!key) {
+      return "";
+    }
+
+    const stringEntry = game.strings.find((entry) => entry.name === key);
+    if (stringEntry) {
+      return playState.strings?.[stringEntry.id] ?? stringEntry.startValue;
+    }
+
+    const enumEntry = game.flags.find((entry) => entry.name === key);
+    if (enumEntry) {
+      const value = playState.flags?.[enumEntry.id];
+      return value === null || value === undefined ? "" : String(value);
+    }
+
+    const profileEntry = game.profiles.find((entry) => entry.name === key);
+    if (profileEntry) {
+      const value = playState.profiles?.[profileEntry.id];
+      return value === null || value === undefined ? "" : String(value);
+    }
+
+    const integerEntry = game.trackers.find((entry) => entry.name === key);
+    if (integerEntry) {
+      return String(playState.trackers?.[integerEntry.id] ?? integerEntry.startValue ?? "");
+    }
+
+    return "";
+  });
+}
+
 function buildConnectionPaths(game) {
-  const nodeMap = new Map(game.nodes.map((node) => [node.id, node]));
+  const paths = [];
 
-  return game.nodes
-    .flatMap((node) =>
-      node.options.map((option, index) => {
-        if (option.terminal !== "target" || !option.targetNodeId) {
-          return "";
-        }
+  game.nodes.forEach((node) => {
+    node.options.forEach((option) => {
+      if (option.terminal !== "target") {
+        return;
+      }
 
-        const target = nodeMap.get(option.targetNodeId);
-        if (!target) {
-          return "";
-        }
+      const start = getWorldPointForElement(`[data-connect-option-id="${escapeAttr(option.id)}"]`);
+      const end = option.targetClusterId
+        ? getWorldPointForElement(`[data-cluster-inlet-id="${escapeAttr(option.targetClusterId)}"]`)
+        : option.targetNodeId
+          ? getWorldPointForElement(`[data-node-inlet-id="${escapeAttr(option.targetNodeId)}"]`)
+          : null;
+      if (!start || !end) {
+        return;
+      }
 
-        const startX = node.position.x + NODE_WIDTH;
-        const startY = node.position.y + NODE_HEADER_HEIGHT + index * NODE_OPTION_HEIGHT + 18;
-        const endX = target.position.x;
-        const endY = target.position.y + 52;
-        const handle = Math.max(70, Math.abs(endX - startX) / 2);
+      paths.push(renderConnectionPath(start, end));
+    });
+  });
 
-        return `<path class="connection-path" d="M ${startX} ${startY} C ${startX + handle} ${startY}, ${
-          endX - handle
-        } ${endY}, ${endX} ${endY}" />`;
-      })
-    )
-    .join("");
+  game.clusters.forEach((cluster) => {
+    if (!cluster.targetNodeId) {
+      return;
+    }
+
+    const start = getWorldPointForElement(`[data-connect-cluster-id="${escapeAttr(cluster.id)}"]`);
+    const end = getWorldPointForElement(`[data-node-inlet-id="${escapeAttr(cluster.targetNodeId)}"]`);
+    if (!start || !end) {
+      return;
+    }
+
+    paths.push(renderConnectionPath(start, end, "cluster-link"));
+  });
+
+  if (appState.drag?.type === "connect" || appState.drag?.type === "connectCluster") {
+    const start = appState.drag.type === "connect"
+      ? getWorldPointForElement(`[data-connect-option-id="${escapeAttr(appState.drag.optionId)}"]`)
+      : getWorldPointForElement(`[data-connect-cluster-id="${escapeAttr(appState.drag.clusterId)}"]`);
+    const end = clientPointToWorld(appState.drag.pointerX, appState.drag.pointerY);
+    if (start && end) {
+      paths.push(renderConnectionPath(start, end, "preview"));
+    }
+  }
+
+  return paths.join("");
+}
+
+function renderConnectionPath(start, end, extraClass = "") {
+  const delta = Math.max(72, Math.abs(end.x - start.x) / 2);
+  return `<path class="connection-path ${extraClass}" d="M ${start.x} ${start.y} C ${start.x + delta} ${start.y}, ${
+    end.x - delta
+  } ${end.y}, ${end.x} ${end.y}" />`;
+}
+
+function getWorldPointForElement(selector) {
+  const element = refs.graphNodes.querySelector(selector);
+  if (!element) {
+    return null;
+  }
+
+  const rect = element.getBoundingClientRect();
+  return clientPointToWorld(rect.left + rect.width / 2, rect.top + rect.height / 2);
+}
+
+function clientPointToWorld(clientX, clientY) {
+  const worldRect = refs.graphWorld.getBoundingClientRect();
+  return {
+    x: (clientX - worldRect.left) / appState.graph.zoom,
+    y: (clientY - worldRect.top) / appState.graph.zoom,
+  };
 }
 
 function handleHomeClick(event) {
@@ -1352,9 +2058,9 @@ function handleHomeClick(event) {
     case "home-create-new":
       appState.createGame = createGameScaffold();
       normalizeEditorSelection();
-      centerGraph();
       persistEditorDraft();
       switchView("create");
+      requestAnimationFrame(centerGraph);
       break;
     case "home-create-load":
       refs.createGameInput.click();
@@ -1426,7 +2132,7 @@ async function handlePlaySaveImport(event) {
     const parsed = JSON.parse(raw);
     const save = normalizePlaySave(parsed.state ?? parsed, appState.playGame);
 
-    if (!save || save.gameId !== appState.playGame.metadata.id) {
+    if (!save || save.gameId !== getGameCacheKey(appState.playGame)) {
       throw new Error("Save does not match the loaded game.");
     }
 
@@ -1447,15 +2153,16 @@ function startPlayFromGame(game, { fromDraft }) {
 
   appState.playGame = game;
   appState.playValidation = validation;
+  appState.playContext = { fromDraft: Boolean(fromDraft) };
 
-  if (errors.length) {
+  if (errors.length && !fromDraft) {
     appState.playState = null;
     appState.playError = errors;
     switchView("play");
     return;
   }
 
-  const cached = loadPlayCache(game.metadata.id);
+  const cached = loadPlayCache(getGameCacheKey(game));
   if (cached && !fromDraft && window.confirm(`Resume the cached run for "${game.metadata.name}"?`)) {
     appState.playState = normalizePlaySave(cached, game);
   } else {
@@ -1514,24 +2221,11 @@ function applyPlayOption(game, playState, currentNode, option) {
   });
   playState.log.push({
     type: "choice",
-    text: option.text,
+    text: interpolateText(game, playState, (option.text || "").trim()),
   });
 
-  option.trackerEffects.forEach((effect) => {
-    const tracker = getTrackerById(game, effect.trackerId);
-    if (!tracker) {
-      return;
-    }
-
-    playState.trackers[tracker.id] = applyTrackerEffect(tracker, playState.trackers[tracker.id], effect.delta);
-  });
-
-  option.flagEffects.forEach((effect) => {
-    if (!getFlagById(game, effect.flagId)) {
-      return;
-    }
-
-    playState.flags[effect.flagId] = effect.state;
+  option.variableEffects.forEach((effect) => {
+    applyVariableEffect(game, playState, effect);
   });
 
   const transition = resolveTransition(game, playState, currentNode, option);
@@ -1623,8 +2317,8 @@ function appendMessageLog(playState, node) {
   playState.log.push({
     type: "message",
     name: node.name,
-    secondary: node.secondary,
-    body: node.body,
+    secondary: interpolateText(appState.playGame, playState, buildNodeSecondaryLine(appState.playGame, node)),
+    body: interpolateText(appState.playGame, playState, getNodeRuntimeBody(appState.playGame, playState, node)),
   });
 }
 
@@ -1641,7 +2335,8 @@ function maybeCompleteOnEndpoint(playState, node) {
 
 function resolveTransition(game, playState, currentNode, option) {
   if (option.terminal === "target") {
-    return option.targetNodeId ? { type: "node", nodeId: option.targetNodeId } : { type: "error" };
+    const targetNodeId = resolveOptionTargetNodeId(game, option);
+    return targetNodeId ? { type: "node", nodeId: targetNodeId } : { type: "error" };
   }
 
   if (option.terminal === "chapterEnd") {
@@ -1659,6 +2354,13 @@ function resolveTransition(game, playState, currentNode, option) {
   return { type: "error" };
 }
 
+function resolveOptionTargetNodeId(game, option) {
+  if (option.targetClusterId) {
+    return getClusterById(game, option.targetClusterId)?.targetNodeId || null;
+  }
+  return option.targetNodeId || null;
+}
+
 function restartPlaySession() {
   if (!appState.playGame) {
     return;
@@ -1674,6 +2376,44 @@ function restartPlaySession() {
   renderPlayView();
 }
 
+function rewindTestPlayChoice() {
+  if (!appState.playGame || !appState.playState || !appState.playContext.fromDraft) {
+    return;
+  }
+
+  const replayHistory = appState.playState.history.slice(0, -1);
+  const nextState = createPlayState(appState.playGame);
+  nextState.notes = appState.playState.notes;
+
+  for (const step of replayHistory) {
+    if (nextState.status !== "active") {
+      break;
+    }
+
+    const currentNode = getNodeById(appState.playGame, nextState.currentNodeId);
+    if (!currentNode) {
+      break;
+    }
+
+    const option = getOptionById(currentNode, step.optionId);
+    if (!option) {
+      break;
+    }
+
+    const availability = evaluateOptionAvailability(appState.playGame, nextState, option);
+    if (availability.state !== "selectable") {
+      break;
+    }
+
+    applyPlayOption(appState.playGame, nextState, currentNode, option);
+  }
+
+  nextState.updatedAt = new Date().toISOString();
+  appState.playState = nextState;
+  persistPlayCache();
+  renderPlayView();
+}
+
 function exportPlaySave() {
   if (!appState.playState || !appState.playGame) {
     return;
@@ -1683,8 +2423,8 @@ function exportPlaySave() {
     format: SAVE_FORMAT,
     version: GAME_VERSION,
     savedAt: new Date().toISOString(),
-    gameId: appState.playGame.metadata.id,
-    state: appState.playState,
+    gameId: getGameCacheKey(appState.playGame),
+    state: serializePlayState(appState.playState),
   };
   const filename = `${slugify(appState.playGame.metadata.name)}-save-${timestampForFile()}.json`;
   downloadTextFile(filename, JSON.stringify(payload, null, 2));
@@ -1696,7 +2436,7 @@ function exportEditorGame() {
   }
 
   const filename = `${slugify(appState.createGame.metadata.name)}.json`;
-  downloadTextFile(filename, JSON.stringify(appState.createGame, null, 2));
+  downloadTextFile(filename, JSON.stringify(serializeGame(appState.createGame), null, 2));
 }
 
 function handleTabClick(event) {
@@ -1706,6 +2446,9 @@ function handleTabClick(event) {
   }
 
   appState.createTab = button.dataset.tabId;
+  if (appState.createTab !== "trackers") {
+    appState.selection.trackerMenuId = null;
+  }
   renderCreateView();
 }
 
@@ -1717,39 +2460,48 @@ function handleSidebarClick(event) {
   }
 
   switch (action) {
+    case "proxy-new":
+      refs.editorNewButton.click();
+      break;
+    case "proxy-load":
+      refs.editorLoadButton.click();
+      break;
+    case "proxy-download":
+      refs.editorDownloadButton.click();
+      break;
+    case "proxy-test":
+      refs.editorTestPlayButton.click();
+      break;
+    case "proxy-home":
+      refs.editorBackHomeButton.click();
+      break;
     case "add-chapter":
       addChapter();
-      break;
-    case "move-chapter-up":
-      moveItem(appState.createGame.chapters, actionElement.dataset.chapterId, -1);
-      commitEditorChange();
-      break;
-    case "move-chapter-down":
-      moveItem(appState.createGame.chapters, actionElement.dataset.chapterId, 1);
-      commitEditorChange();
       break;
     case "delete-chapter":
       deleteChapter(actionElement.dataset.chapterId);
       break;
     case "add-tracker":
+      appState.selection.trackerMenuId = null;
       addTracker();
+      break;
+    case "toggle-tracker-menu":
+      appState.selection.trackerMenuId =
+        appState.selection.trackerMenuId === actionElement.dataset.trackerId ? null : actionElement.dataset.trackerId;
+      renderCreateView();
+      break;
+    case "duplicate-tracker":
+      duplicateTracker(actionElement.dataset.trackerId);
       break;
     case "delete-tracker":
       appState.createGame.trackers = appState.createGame.trackers.filter(
         (tracker) => tracker.id !== actionElement.dataset.trackerId
       );
+      appState.selection.trackerMenuId = null;
       commitEditorChange();
       break;
     case "add-group":
       addTrackerGroup();
-      break;
-    case "move-group-up":
-      moveItem(appState.createGame.trackerGroups, actionElement.dataset.groupId, -1);
-      commitEditorChange();
-      break;
-    case "move-group-down":
-      moveItem(appState.createGame.trackerGroups, actionElement.dataset.groupId, 1);
-      commitEditorChange();
       break;
     case "delete-group":
       deleteTrackerGroup(actionElement.dataset.groupId);
@@ -1759,6 +2511,82 @@ function handleSidebarClick(event) {
       break;
     case "delete-flag":
       appState.createGame.flags = appState.createGame.flags.filter((flag) => flag.id !== actionElement.dataset.flagId);
+      commitEditorChange();
+      break;
+    case "add-profile":
+      appState.createGame.profiles.push(createProfile());
+      commitEditorChange();
+      break;
+    case "delete-profile":
+      appState.createGame.profiles = appState.createGame.profiles.filter(
+        (profile) => profile.id !== actionElement.dataset.profileId
+      );
+      commitEditorChange();
+      break;
+    case "add-profile-state": {
+      const profile = getProfileById(appState.createGame, actionElement.dataset.profileId);
+      if (!profile) {
+        break;
+      }
+      profile.states.push(createProfileState(`State ${profile.states.length + 1}`));
+      if (profile.startState === null && profile.states.length) {
+        profile.startState = profile.states[0].name;
+      }
+      commitEditorChange();
+      break;
+    }
+    case "delete-profile-state": {
+      const profile = getProfileById(appState.createGame, actionElement.dataset.profileId);
+      if (!profile) {
+        break;
+      }
+      const state = getProfileStateById(profile, actionElement.dataset.profileStateId);
+      profile.states = profile.states.filter((entry) => entry.id !== actionElement.dataset.profileStateId);
+      if (state && profile.startState === state.name) {
+        profile.startState = null;
+      }
+      commitEditorChange();
+      break;
+    }
+    case "add-profile-mapping": {
+      const profile = getProfileById(appState.createGame, actionElement.dataset.profileId);
+      const state = getProfileStateById(profile, actionElement.dataset.profileStateId);
+      if (!state) {
+        break;
+      }
+      state.mappings.push(createVariableEffect("tracker", appState.createGame.trackers[0]?.id ?? null));
+      commitEditorChange();
+      break;
+    }
+    case "remove-profile-mapping": {
+      const profile = getProfileById(appState.createGame, actionElement.dataset.profileId);
+      const state = getProfileStateById(profile, actionElement.dataset.profileStateId);
+      if (!state) {
+        break;
+      }
+      state.mappings = state.mappings.filter((mapping) => mapping.id !== actionElement.dataset.variableEffectId);
+      commitEditorChange();
+      break;
+    }
+    case "add-string":
+      appState.createGame.strings.push(createStringVariable());
+      commitEditorChange();
+      break;
+    case "delete-string":
+      appState.createGame.strings = appState.createGame.strings.filter((entry) => entry.id !== actionElement.dataset.stringId);
+      commitEditorChange();
+      break;
+    case "add-location":
+      appState.createGame.world.locations.push(`Location ${appState.createGame.world.locations.length + 1}`);
+      commitEditorChange();
+      break;
+    case "delete-location":
+      appState.createGame.world.locations.splice(Number(actionElement.dataset.locationIndex), 1);
+      appState.createGame.nodes.forEach((node) => {
+        if (node.location && !appState.createGame.world.locations.includes(node.location)) {
+          node.location = "";
+        }
+      });
       commitEditorChange();
       break;
     default:
@@ -1779,9 +2607,26 @@ function handleSidebarChange(event) {
     return;
   }
 
-  if (target.hasAttribute("data-root-node-select")) {
-    appState.createGame.rootNodeId = target.value;
-    normalizeEditorSelection();
+  if (target.dataset.worldField) {
+    appState.createGame.world[target.dataset.worldField] = target.value;
+    commitEditorChange();
+    return;
+  }
+
+  if (target.dataset.locationIndex !== undefined) {
+    const index = Number(target.dataset.locationIndex);
+    const previous = appState.createGame.world.locations[index];
+    const nextValue = target.value.trim();
+    if (!nextValue) {
+      appState.createGame.world.locations.splice(index, 1);
+    } else {
+      appState.createGame.world.locations[index] = nextValue;
+    }
+    appState.createGame.nodes.forEach((node) => {
+      if (node.location === previous) {
+        node.location = nextValue;
+      }
+    });
     commitEditorChange();
     return;
   }
@@ -1804,11 +2649,13 @@ function handleSidebarChange(event) {
     }
 
     tracker[target.dataset.trackerField] =
-      target.dataset.trackerField === "startValue"
-        ? parseNumberOrFallback(target.value, 0)
-        : target.dataset.trackerField === "min" || target.dataset.trackerField === "max"
-          ? parseNullableNumber(target.value)
-          : target.value || null;
+      target.type === "checkbox"
+        ? target.checked
+        : target.dataset.trackerField === "startValue"
+          ? parseNumberOrFallback(target.value, 0)
+          : target.dataset.trackerField === "min" || target.dataset.trackerField === "max"
+            ? parseNullableNumber(target.value)
+            : target.value || null;
     commitEditorChange();
     return;
   }
@@ -1831,11 +2678,631 @@ function handleSidebarChange(event) {
     }
 
     flag[target.dataset.flagField] =
-      target.dataset.flagField === "states" ? parseStatesInput(target.value) : target.value;
+      target.type === "checkbox"
+        ? target.checked
+        : target.dataset.flagField === "states"
+          ? parseStatesInput(target.value)
+          : target.value;
+    commitEditorChange();
+    return;
+  }
+
+  if (target.dataset.profileField) {
+    const profile = getProfileById(appState.createGame, target.dataset.profileId);
+    if (!profile) {
+      return;
+    }
+
+    profile[target.dataset.profileField] =
+      target.type === "checkbox" ? target.checked : fromNullableSelectValue(target.value);
+    commitEditorChange();
+    return;
+  }
+
+  if (target.dataset.profileStateField) {
+    const profile = getProfileById(appState.createGame, target.dataset.profileId);
+    const state = getProfileStateById(profile, target.dataset.profileStateId);
+    if (!profile || !state) {
+      return;
+    }
+
+    if (target.dataset.profileStateField === "name") {
+      const previousName = state.name;
+      state.name = target.value;
+      if (profile.startState === previousName) {
+        profile.startState = state.name;
+      }
+    } else {
+      state[target.dataset.profileStateField] = target.value;
+    }
+    commitEditorChange();
+    return;
+  }
+
+  if (target.dataset.variableEffectId && target.dataset.profileId && target.dataset.profileStateId) {
+    const profile = getProfileById(appState.createGame, target.dataset.profileId);
+    const state = getProfileStateById(profile, target.dataset.profileStateId);
+    const effect = state?.mappings.find((item) => item.id === target.dataset.variableEffectId);
+    if (!effect) {
+      return;
+    }
+
+    const field = target.dataset.variableEffectField;
+    if (field === "variableType") {
+      Object.assign(effect, createVariableEffect(target.value, getFirstVariableId(appState.createGame, target.value), effect.id));
+    } else if (field === "action") {
+      effect.action = target.value;
+    } else if (field === "value") {
+      effect.value =
+        effect.variableType === "flag" || effect.variableType === "profile"
+          ? fromNullableSelectValue(target.value)
+          : effect.variableType === "tracker"
+            ? parseNumberOrFallback(target.value, 0)
+            : target.value;
+    } else {
+      effect[field] = target.value || null;
+    }
+    commitEditorChange();
+    return;
+  }
+
+  if (target.dataset.stringField) {
+    const entry = appState.createGame.strings.find((item) => item.id === target.dataset.stringId);
+    if (!entry) {
+      return;
+    }
+
+    entry[target.dataset.stringField] = target.value;
     commitEditorChange();
   }
 }
 
+function handleDocumentMouseDown(event) {
+  if (appState.view === "create" && !event.target.closest(".menu-wrap")) {
+    const hadOpenMenu =
+      appState.selection.trackerMenuId !== null ||
+      appState.selection.nodeMenuId !== null ||
+      appState.selection.paragraphMenuId !== null;
+    if (hadOpenMenu) {
+      appState.selection.trackerMenuId = null;
+      appState.selection.nodeMenuId = null;
+      appState.selection.paragraphMenuId = null;
+      renderCreateView();
+      return;
+    }
+  }
+}
+
+function handleGraphClick(event) {
+  if (!appState.createGame) {
+    return;
+  }
+
+  if (appState.graph.suppressNextGraphClick) {
+    appState.graph.suppressNextGraphClick = false;
+    return;
+  }
+
+  const actionElement = event.target.closest("[data-action]");
+  if (actionElement) {
+    switch (actionElement.dataset.action) {
+      case "toggle-node-menu":
+        appState.selection.nodeId = actionElement.dataset.nodeId;
+        appState.selection.clusterId = null;
+        appState.selection.paragraphId = null;
+        appState.selection.optionId = null;
+        appState.selection.trackerMenuId = null;
+        appState.selection.paragraphMenuId = null;
+        appState.selection.nodeMenuId =
+          appState.selection.nodeMenuId === actionElement.dataset.nodeId ? null : actionElement.dataset.nodeId;
+        renderCreateView();
+        return;
+      case "toggle-paragraph-menu": {
+        const menuKey = buildParagraphMenuKey(actionElement.dataset.nodeId, actionElement.dataset.paragraphId);
+        appState.selection.nodeId = actionElement.dataset.nodeId;
+        appState.selection.clusterId = null;
+        appState.selection.paragraphId = actionElement.dataset.paragraphId;
+        appState.selection.optionId = null;
+        appState.selection.trackerMenuId = null;
+        appState.selection.nodeMenuId = null;
+        appState.selection.paragraphMenuId = appState.selection.paragraphMenuId === menuKey ? null : menuKey;
+        renderCreateView();
+        return;
+      }
+      case "edit-paragraph-settings":
+        appState.selection.nodeId = actionElement.dataset.nodeId;
+        appState.selection.clusterId = null;
+        appState.selection.paragraphId = actionElement.dataset.paragraphId;
+        appState.selection.optionId = null;
+        appState.selection.paragraphMenuId = null;
+        renderCreateView();
+        return;
+      case "add-paragraph-inline":
+        addParagraph(actionElement.dataset.nodeId);
+        return;
+      case "add-option-inline": {
+        const node = getNodeById(appState.createGame, actionElement.dataset.nodeId);
+        if (!node) {
+          return;
+        }
+        const option = createOption();
+        node.options.push(option);
+        appState.selection.nodeId = node.id;
+        appState.selection.clusterId = null;
+        appState.selection.paragraphId = null;
+        appState.selection.optionId = option.id;
+        appState.selection.nodeMenuId = null;
+        appState.selection.paragraphMenuId = null;
+        commitEditorChange();
+        return;
+      }
+      case "delete-cluster":
+        deleteSelectedCluster();
+        return;
+      case "duplicate-paragraph-inline":
+        duplicateParagraph(actionElement.dataset.nodeId, actionElement.dataset.paragraphId);
+        return;
+      case "move-paragraph-up":
+        moveParagraph(
+          actionElement.dataset.nodeId || appState.selection.nodeId,
+          actionElement.dataset.paragraphId || appState.selection.paragraphId,
+          -1
+        );
+        return;
+      case "move-paragraph-down":
+        moveParagraph(
+          actionElement.dataset.nodeId || appState.selection.nodeId,
+          actionElement.dataset.paragraphId || appState.selection.paragraphId,
+          1
+        );
+        return;
+      case "delete-paragraph-inline":
+        deleteParagraph(actionElement.dataset.nodeId, actionElement.dataset.paragraphId);
+        return;
+      case "duplicate-node-inline":
+        duplicateNode(actionElement.dataset.nodeId);
+        return;
+      case "delete-node-inline":
+        appState.selection.nodeId = actionElement.dataset.nodeId;
+        appState.selection.clusterId = null;
+        appState.selection.paragraphId = null;
+        appState.selection.optionId = null;
+        appState.selection.nodeMenuId = null;
+        deleteSelectedNode();
+        return;
+      default:
+        break;
+    }
+  }
+
+  if (event.target.closest("input, textarea, select, label, button")) {
+    return;
+  }
+
+  const optionElement = event.target.closest("[data-option-id]");
+  if (optionElement) {
+    appState.selection.nodeId = optionElement.dataset.nodeId;
+    appState.selection.clusterId = null;
+    appState.selection.paragraphId = null;
+    appState.selection.optionId = optionElement.dataset.optionId;
+    appState.selection.trackerMenuId = null;
+    appState.selection.nodeMenuId = null;
+    appState.selection.paragraphMenuId = null;
+    renderCreateView();
+    return;
+  }
+
+  const paragraphElement = event.target.closest("[data-paragraph-id]");
+  if (paragraphElement) {
+    appState.selection.nodeId = paragraphElement.dataset.nodeId;
+    appState.selection.clusterId = null;
+    appState.selection.paragraphId = paragraphElement.dataset.paragraphId;
+    appState.selection.optionId = null;
+    appState.selection.trackerMenuId = null;
+    appState.selection.nodeMenuId = null;
+    appState.selection.paragraphMenuId = null;
+    renderCreateView();
+    return;
+  }
+
+  const clusterElement = event.target.closest("[data-cluster-id]");
+  if (clusterElement) {
+    appState.selection.nodeId = null;
+    appState.selection.clusterId = clusterElement.dataset.clusterId;
+    appState.selection.paragraphId = null;
+    appState.selection.optionId = null;
+    appState.selection.trackerMenuId = null;
+    appState.selection.nodeMenuId = null;
+    appState.selection.paragraphMenuId = null;
+    renderCreateView();
+    return;
+  }
+
+  const nodeElement = event.target.closest("[data-node-id]");
+  if (nodeElement) {
+    appState.selection.nodeId = nodeElement.dataset.nodeId;
+    appState.selection.clusterId = null;
+    appState.selection.paragraphId = null;
+    appState.selection.optionId = null;
+    appState.selection.trackerMenuId = null;
+    appState.selection.nodeMenuId = null;
+    appState.selection.paragraphMenuId = null;
+    renderCreateView();
+    return;
+  }
+
+  clearEditorSelection();
+}
+
+function clearEditorSelection() {
+  const hadSelection =
+    appState.selection.nodeId !== null ||
+    appState.selection.clusterId !== null ||
+    appState.selection.paragraphId !== null ||
+    appState.selection.optionId !== null ||
+    appState.selection.trackerMenuId !== null ||
+    appState.selection.nodeMenuId !== null ||
+    appState.selection.paragraphMenuId !== null;
+  appState.selection.nodeId = null;
+  appState.selection.clusterId = null;
+  appState.selection.paragraphId = null;
+  appState.selection.optionId = null;
+  appState.selection.trackerMenuId = null;
+  appState.selection.nodeMenuId = null;
+  appState.selection.paragraphMenuId = null;
+  if (hadSelection) {
+    renderCreateView();
+  }
+}
+
+function handleGraphFocusIn(event) {
+  if (!appState.createGame) {
+    return;
+  }
+
+  const paragraphElement = event.target.closest("[data-paragraph-id]");
+  const optionElement = event.target.closest("[data-option-id]");
+  if (optionElement) {
+    appState.selection.nodeId = optionElement.dataset.nodeId;
+    appState.selection.clusterId = null;
+    appState.selection.paragraphId = null;
+    appState.selection.optionId = optionElement.dataset.optionId;
+    renderInspector(appState.createGame);
+    return;
+  }
+
+  if (paragraphElement) {
+    appState.selection.nodeId = paragraphElement.dataset.nodeId;
+    appState.selection.clusterId = null;
+    appState.selection.paragraphId = paragraphElement.dataset.paragraphId;
+    appState.selection.optionId = null;
+    renderInspector(appState.createGame);
+    return;
+  }
+
+  const clusterElement = event.target.closest("[data-cluster-id]");
+  if (clusterElement) {
+    appState.selection.nodeId = null;
+    appState.selection.clusterId = clusterElement.dataset.clusterId;
+    appState.selection.paragraphId = null;
+    appState.selection.optionId = null;
+    renderInspector(appState.createGame);
+  }
+}
+
+function handleNodeDragStart(event) {
+  if (!appState.createGame) {
+    return;
+  }
+
+  const clusterHandle = event.target.closest("[data-connect-cluster-id]");
+  if (clusterHandle) {
+    appState.drag = {
+      type: "connectCluster",
+      clusterId: clusterHandle.dataset.connectClusterId,
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+    };
+    refs.graphConnections.innerHTML = buildConnectionPaths(appState.createGame);
+    event.preventDefault();
+    return;
+  }
+
+  const optionHandle = event.target.closest("[data-connect-option-id]");
+  if (optionHandle) {
+    appState.drag = {
+      type: "connect",
+      nodeId: optionHandle.dataset.nodeId,
+      optionId: optionHandle.dataset.connectOptionId,
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+    };
+    refs.graphConnections.innerHTML = buildConnectionPaths(appState.createGame);
+    event.preventDefault();
+    return;
+  }
+
+  const clusterDragHandle = event.target.closest("[data-drag-cluster-id]");
+  if (clusterDragHandle && !event.target.closest("button, input, textarea, select")) {
+    const cluster = getClusterById(appState.createGame, clusterDragHandle.dataset.dragClusterId);
+    if (!cluster) {
+      return;
+    }
+
+    appState.selection.nodeId = null;
+    appState.selection.clusterId = cluster.id;
+    appState.selection.optionId = null;
+    appState.selection.paragraphId = null;
+    appState.drag = {
+      type: "cluster",
+      clusterId: cluster.id,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: cluster.position.x,
+      originY: cluster.position.y,
+    };
+    event.preventDefault();
+    return;
+  }
+
+  const dragHandle = event.target.closest("[data-drag-node-id]");
+  if (!dragHandle || event.target.closest("button, input, textarea, select")) {
+    return;
+  }
+
+  const node = getNodeById(appState.createGame, dragHandle.dataset.dragNodeId);
+  if (!node) {
+    return;
+  }
+
+  appState.selection.nodeId = node.id;
+  appState.selection.clusterId = null;
+  appState.selection.optionId = null;
+  appState.drag = {
+    type: "node",
+    nodeId: node.id,
+    startX: event.clientX,
+    startY: event.clientY,
+    originX: node.position.x,
+    originY: node.position.y,
+  };
+  event.preventDefault();
+}
+
+function handleViewportPanStart(event) {
+  if (!appState.createGame) {
+    return;
+  }
+
+  if (event.target.closest(".graph-node, .graph-cluster, .create-panel, .graph-floating-controls")) {
+    return;
+  }
+
+  appState.drag = {
+    type: "pan",
+    startX: event.clientX,
+    startY: event.clientY,
+    originX: appState.graph.panX,
+    originY: appState.graph.panY,
+    moved: false,
+    startTarget: event.target,
+  };
+  refs.graphViewport.classList.add("dragging");
+  event.preventDefault();
+}
+
+function handleGraphWheel(event) {
+  if (appState.view !== "create") {
+    return;
+  }
+
+  if (event.target.closest(".create-panel, input, textarea, select")) {
+    return;
+  }
+
+  event.preventDefault();
+
+  const factor = event.deltaY < 0 ? 1.025 : 1 / 1.025;
+  const oldZoom = appState.graph.zoom;
+  const nextZoom = clamp(oldZoom * factor, 0.45, 1.8);
+  const rect = refs.graphViewport.getBoundingClientRect();
+  const pointerX = event.clientX - rect.left;
+  const pointerY = event.clientY - rect.top;
+  const worldX = (pointerX - appState.graph.panX) / oldZoom;
+  const worldY = (pointerY - appState.graph.panY) / oldZoom;
+
+  appState.graph.zoom = nextZoom;
+  appState.graph.panX = pointerX - worldX * nextZoom;
+  appState.graph.panY = pointerY - worldY * nextZoom;
+  renderCreateView();
+}
+
+function handleDocumentDrag(event) {
+  if (!appState.drag || !appState.createGame) {
+    return;
+  }
+
+  if (appState.drag.type === "pan") {
+    const movedX = event.clientX - appState.drag.startX;
+    const movedY = event.clientY - appState.drag.startY;
+    if (Math.abs(movedX) > 3 || Math.abs(movedY) > 3) {
+      appState.drag.moved = true;
+    }
+    appState.graph.panX = appState.drag.originX + (event.clientX - appState.drag.startX);
+    appState.graph.panY = appState.drag.originY + (event.clientY - appState.drag.startY);
+    applyGraphTransform();
+    refs.graphConnections.innerHTML = buildConnectionPaths(appState.createGame);
+    return;
+  }
+
+  if (appState.drag.type === "node") {
+    const node = getNodeById(appState.createGame, appState.drag.nodeId);
+    if (!node) {
+      return;
+    }
+
+    node.position.x = clamp(
+      Math.round(appState.drag.originX + (event.clientX - appState.drag.startX) / appState.graph.zoom),
+      0,
+      GRAPH_WORLD_WIDTH - NODE_WIDTH - 40
+    );
+    node.position.y = clamp(
+      Math.round(appState.drag.originY + (event.clientY - appState.drag.startY) / appState.graph.zoom),
+      0,
+      GRAPH_WORLD_HEIGHT - 200
+    );
+    renderGraph(appState.createGame);
+    return;
+  }
+
+  if (appState.drag.type === "cluster") {
+    const cluster = getClusterById(appState.createGame, appState.drag.clusterId);
+    if (!cluster) {
+      return;
+    }
+
+    cluster.position.x = clamp(
+      Math.round(appState.drag.originX + (event.clientX - appState.drag.startX) / appState.graph.zoom),
+      0,
+      GRAPH_WORLD_WIDTH - 180
+    );
+    cluster.position.y = clamp(
+      Math.round(appState.drag.originY + (event.clientY - appState.drag.startY) / appState.graph.zoom),
+      0,
+      GRAPH_WORLD_HEIGHT - 120
+    );
+    renderGraph(appState.createGame);
+    return;
+  }
+
+  if (appState.drag.type === "connect" || appState.drag.type === "connectCluster") {
+    appState.drag.pointerX = event.clientX;
+    appState.drag.pointerY = event.clientY;
+    refs.graphConnections.innerHTML = buildConnectionPaths(appState.createGame);
+  }
+}
+
+function handleDocumentDragEnd(event) {
+  if (!appState.drag) {
+    return;
+  }
+
+  if (appState.drag.type === "pan") {
+    if (!appState.drag.moved && !appState.drag.startTarget?.closest(".graph-node, .graph-cluster, .create-panel, .graph-floating-controls")) {
+      clearEditorSelection();
+    } else if (appState.drag.moved) {
+      appState.graph.suppressNextGraphClick = true;
+    }
+  } else if (appState.drag.type === "node") {
+    persistEditorDraft();
+  } else if (appState.drag.type === "cluster") {
+    persistEditorDraft();
+  } else if ((appState.drag.type === "connect" || appState.drag.type === "connectCluster") && appState.createGame) {
+    const targetElement = event.target.closest("[data-connect-target-node-id]");
+    const clusterTargetElement = event.target.closest("[data-connect-target-cluster-id]");
+    if (appState.drag.type === "connect") {
+      const sourceNode = getNodeById(appState.createGame, appState.drag.nodeId);
+      const option = getOptionById(sourceNode, appState.drag.optionId);
+      if (option && targetElement) {
+        option.terminal = "target";
+        option.targetClusterId = null;
+        option.targetNodeId = targetElement.dataset.connectTargetNodeId;
+        appState.selection.nodeId = appState.drag.nodeId;
+        appState.selection.clusterId = null;
+        appState.selection.paragraphId = null;
+        appState.selection.optionId = appState.drag.optionId;
+        commitEditorChange();
+        appState.drag = null;
+        refs.graphViewport.classList.remove("dragging");
+        return;
+      }
+
+      if (option && clusterTargetElement) {
+        option.terminal = "target";
+        option.targetClusterId = clusterTargetElement.dataset.connectTargetClusterId;
+        option.targetNodeId = null;
+        appState.selection.nodeId = appState.drag.nodeId;
+        appState.selection.clusterId = null;
+        appState.selection.paragraphId = null;
+        appState.selection.optionId = appState.drag.optionId;
+        commitEditorChange();
+        appState.drag = null;
+        refs.graphViewport.classList.remove("dragging");
+        return;
+      }
+
+      if (option && shouldCreateNodeFromConnectDrop(event.target)) {
+        createConnectedNodeAtPoint(sourceNode, option, clientPointToWorld(event.clientX, event.clientY));
+        appState.drag = null;
+        refs.graphViewport.classList.remove("dragging");
+        return;
+      }
+    } else {
+      const cluster = getClusterById(appState.createGame, appState.drag.clusterId);
+      if (cluster && targetElement) {
+        cluster.targetNodeId = targetElement.dataset.connectTargetNodeId;
+        appState.selection.nodeId = null;
+        appState.selection.clusterId = cluster.id;
+        appState.selection.paragraphId = null;
+        appState.selection.optionId = null;
+        commitEditorChange();
+        appState.drag = null;
+        refs.graphViewport.classList.remove("dragging");
+        return;
+      }
+    }
+
+    if (appState.drag.type === "connect") {
+      const sourceNode = getNodeById(appState.createGame, appState.drag.nodeId);
+      const option = getOptionById(sourceNode, appState.drag.optionId);
+      if (option && shouldCreateNodeFromConnectDrop(event.target)) {
+      createConnectedNodeAtPoint(sourceNode, option, clientPointToWorld(event.clientX, event.clientY));
+      appState.drag = null;
+      refs.graphViewport.classList.remove("dragging");
+      return;
+      }
+    }
+  }
+
+  appState.drag = null;
+  if (appState.createGame) {
+    refs.graphConnections.innerHTML = buildConnectionPaths(appState.createGame);
+  }
+  refs.graphViewport.classList.remove("dragging");
+}
+
+function shouldCreateNodeFromConnectDrop(target) {
+  return Boolean(
+    target.closest("#graphViewport") &&
+      !target.closest(".create-panel, .graph-floating-controls, .graph-node, .graph-cluster")
+  );
+}
+
+function createConnectedNodeAtPoint(sourceNode, option, point) {
+  const template = getNodeCreationTemplate(appState.createGame, sourceNode?.id);
+  const node = createNode(sourceNode?.chapterId || appState.createGame.chapters[0]?.id, undefined, template);
+  node.position.x = clamp(Math.round(point.x + 28), 0, GRAPH_WORLD_WIDTH - NODE_WIDTH - 40);
+  node.position.y = clamp(Math.round(point.y - 82), 0, GRAPH_WORLD_HEIGHT - 220);
+  appState.createGame.nodes.push(node);
+  const chapter = getChapterById(appState.createGame, node.chapterId);
+  if (chapter && !chapter.startNodeId) {
+    chapter.startNodeId = node.id;
+  }
+  option.terminal = "target";
+  option.targetClusterId = null;
+  option.targetNodeId = node.id;
+  appState.selection.nodeId = node.id;
+  appState.selection.clusterId = null;
+  appState.selection.paragraphId = null;
+  appState.selection.optionId = null;
+  commitEditorChange();
+}
+
+function addChapter() {
+  const chapter = createChapter(`Chapter ${appState.createGame.chapters.length + 1}`);
+  appState.createGame.chapters.push(chapter);
+  commitEditorChange();
+}
 function handleInspectorClick(event) {
   const actionElement = event.target.closest("[data-action]");
   const action = actionElement?.dataset.action;
@@ -1844,10 +3311,19 @@ function handleInspectorClick(event) {
   }
 
   switch (action) {
+    case "clear-paragraph-selection":
+      appState.selection.paragraphId = null;
+      renderCreateView();
+      break;
+    case "clear-cluster-selection":
+      appState.selection.clusterId = null;
+      renderCreateView();
+      break;
     case "add-option":
       withSelectedNode((node) => {
         const option = createOption();
         node.options.push(option);
+        appState.selection.paragraphId = null;
         appState.selection.optionId = option.id;
       });
       commitEditorChange();
@@ -1856,6 +3332,7 @@ function handleInspectorClick(event) {
       deleteSelectedNode();
       break;
     case "clear-option-selection":
+      appState.selection.paragraphId = null;
       appState.selection.optionId = null;
       renderCreateView();
       break;
@@ -1866,50 +3343,73 @@ function handleInspectorClick(event) {
       });
       commitEditorChange();
       break;
-    case "add-tracker-requirement":
+    case "delete-cluster":
+      deleteSelectedCluster();
+      break;
+    case "move-option-up":
+      moveOption(appState.selection.nodeId, appState.selection.optionId, -1);
+      break;
+    case "move-option-down":
+      moveOption(appState.selection.nodeId, appState.selection.optionId, 1);
+      break;
+    case "add-paragraph-variable-check":
+      withSelectedParagraph((paragraph, game) => {
+        paragraph.requirements.push(createTrackerRequirement(game.trackers[0]?.id ?? null));
+      });
+      commitEditorChange();
+      break;
+    case "duplicate-paragraph-inline":
+      duplicateParagraph(actionElement.dataset.nodeId || appState.selection.nodeId, actionElement.dataset.paragraphId || appState.selection.paragraphId);
+      break;
+    case "move-paragraph-up":
+      moveParagraph(
+        actionElement.dataset.nodeId || appState.selection.nodeId,
+        actionElement.dataset.paragraphId || appState.selection.paragraphId,
+        -1
+      );
+      break;
+    case "move-paragraph-down":
+      moveParagraph(
+        actionElement.dataset.nodeId || appState.selection.nodeId,
+        actionElement.dataset.paragraphId || appState.selection.paragraphId,
+        1
+      );
+      break;
+    case "delete-paragraph-inline":
+      deleteParagraph(actionElement.dataset.nodeId || appState.selection.nodeId, actionElement.dataset.paragraphId || appState.selection.paragraphId);
+      break;
+    case "add-variable-check":
       withSelectedOption((option, game) => {
         option.requirements.push(createTrackerRequirement(game.trackers[0]?.id ?? null));
       });
       commitEditorChange();
       break;
-    case "add-flag-requirement":
-      withSelectedOption((option, game) => {
-        option.requirements.push(createFlagRequirement(game.flags[0]?.id ?? null));
-      });
-      commitEditorChange();
-      break;
     case "remove-requirement":
-      withSelectedOption((option) => {
-        option.requirements = option.requirements.filter(
-          (requirement) => requirement.id !== actionElement.dataset.requirementId
-        );
-      });
+      if (appState.selection.paragraphId) {
+        withSelectedParagraph((paragraph) => {
+          paragraph.requirements = paragraph.requirements.filter(
+            (requirement) => requirement.id !== actionElement.dataset.requirementId
+          );
+        });
+      } else {
+        withSelectedOption((option) => {
+          option.requirements = option.requirements.filter(
+            (requirement) => requirement.id !== actionElement.dataset.requirementId
+          );
+        });
+      }
       commitEditorChange();
       break;
-    case "add-tracker-effect":
+    case "add-variable-effect":
       withSelectedOption((option, game) => {
-        option.trackerEffects.push(createTrackerEffect(game.trackers[0]?.id ?? null));
+        option.variableEffects.push(createVariableEffect("tracker", game.trackers[0]?.id ?? null));
       });
       commitEditorChange();
       break;
-    case "remove-tracker-effect":
+    case "remove-variable-effect":
       withSelectedOption((option) => {
-        option.trackerEffects = option.trackerEffects.filter(
-          (effect) => effect.id !== actionElement.dataset.trackerEffectId
-        );
-      });
-      commitEditorChange();
-      break;
-    case "add-flag-effect":
-      withSelectedOption((option, game) => {
-        option.flagEffects.push(createFlagEffect(game.flags[0]?.id ?? null));
-      });
-      commitEditorChange();
-      break;
-    case "remove-flag-effect":
-      withSelectedOption((option) => {
-        option.flagEffects = option.flagEffects.filter(
-          (effect) => effect.id !== actionElement.dataset.flagEffectId
+        option.variableEffects = option.variableEffects.filter(
+          (effect) => effect.id !== actionElement.dataset.variableEffectId
         );
       });
       commitEditorChange();
@@ -1935,30 +3435,48 @@ function handleInspectorChange(event) {
     return;
   }
 
+  if (target.dataset.clusterField) {
+    const cluster = getClusterById(appState.createGame, appState.selection.clusterId);
+    if (!cluster) {
+      return;
+    }
+
+    cluster[target.dataset.clusterField] = target.value || null;
+    commitEditorChange();
+    return;
+  }
+
   if (target.dataset.optionField) {
     withSelectedOption((option) => {
       option[target.dataset.optionField] =
         target.dataset.optionField === "targetNodeId" ? target.value || null : target.value;
+      if (target.dataset.optionField === "targetNodeId") {
+        option.targetClusterId = null;
+      }
     });
     commitEditorChange();
     return;
   }
 
   if (target.dataset.requirementId) {
-    withSelectedOption((option, game) => {
-      const requirement = option.requirements.find((item) => item.id === target.dataset.requirementId);
+    const applyRequirementChange = (container, game) => {
+      const requirement = container.requirements.find((item) => item.id === target.dataset.requirementId);
       if (!requirement) {
         return;
       }
 
       const field = target.dataset.requirementField;
       if (field === "kind") {
+        const joinMode = requirement.joinMode;
         Object.assign(
           requirement,
           target.value === "tracker"
             ? createTrackerRequirement(game.trackers[0]?.id ?? null, requirement.id)
-            : createFlagRequirement(game.flags[0]?.id ?? null, requirement.id)
+            : target.value === "profile"
+              ? createProfileRequirement(game.profiles[0]?.id ?? null, requirement.id)
+              : createFlagRequirement(game.flags[0]?.id ?? null, requirement.id)
         );
+        requirement.joinMode = joinMode;
       } else if (field === "value") {
         requirement.value = parseNumberOrFallback(target.value, 0);
       } else if (field === "state") {
@@ -1966,174 +3484,92 @@ function handleInspectorChange(event) {
       } else {
         requirement[field] = target.value || null;
       }
-    });
+    };
+
+    if (appState.selection.paragraphId) {
+      withSelectedParagraph(applyRequirementChange);
+    } else {
+      withSelectedOption(applyRequirementChange);
+    }
     commitEditorChange();
     return;
   }
 
-  if (target.dataset.trackerEffectId) {
+  if (target.dataset.variableEffectId) {
     withSelectedOption((option) => {
-      const effect = option.trackerEffects.find((item) => item.id === target.dataset.trackerEffectId);
+      const effect = option.variableEffects.find((item) => item.id === target.dataset.variableEffectId);
       if (!effect) {
         return;
       }
 
-      effect[target.dataset.trackerEffectField] =
-        target.dataset.trackerEffectField === "delta"
-          ? parseNumberOrFallback(target.value, 0)
-          : target.value || null;
-    });
-    commitEditorChange();
-    return;
-  }
-
-  if (target.dataset.flagEffectId) {
-    withSelectedOption((option) => {
-      const effect = option.flagEffects.find((item) => item.id === target.dataset.flagEffectId);
-      if (!effect) {
-        return;
+      const field = target.dataset.variableEffectField;
+      if (field === "variableType") {
+        Object.assign(effect, createVariableEffect(target.value, getFirstVariableId(appState.createGame, target.value), effect.id));
+      } else if (field === "action") {
+        effect.action = target.value;
+      } else if (field === "value") {
+        effect.value =
+          effect.variableType === "flag" || effect.variableType === "profile"
+            ? fromNullableSelectValue(target.value)
+            : effect.variableType === "tracker"
+              ? parseNumberOrFallback(target.value, 0)
+              : target.value;
+      } else {
+        effect[field] = target.value || null;
       }
-
-      effect[target.dataset.flagEffectField] =
-        target.dataset.flagEffectField === "state" ? fromNullableSelectValue(target.value) : target.value || null;
     });
     commitEditorChange();
   }
 }
 
-function handleGraphSelection(event) {
-  const optionButton = event.target.closest("[data-option-id]");
-  if (optionButton) {
-    appState.selection.nodeId = optionButton.dataset.nodeId;
-    appState.selection.optionId = optionButton.dataset.optionId;
-    renderCreateView();
-    return;
-  }
-
-  const nodeElement = event.target.closest("[data-node-id]");
-  if (nodeElement) {
-    appState.selection.nodeId = nodeElement.dataset.nodeId;
-    appState.selection.optionId = null;
-    renderCreateView();
-  }
-}
-
-function handleNodeDragStart(event) {
-  const header = event.target.closest(".node-header");
-  if (!header || !appState.createGame) {
-    return;
-  }
-
-  const node = getNodeById(appState.createGame, header.dataset.nodeId);
-  if (!node) {
-    return;
-  }
-
-  appState.selection.nodeId = node.id;
-  appState.selection.optionId = null;
-  appState.drag = {
-    type: "node",
-    nodeId: node.id,
-    startX: event.clientX,
-    startY: event.clientY,
-    originX: node.position.x,
-    originY: node.position.y,
-  };
-  event.preventDefault();
-}
-
-function handleViewportPanStart(event) {
+function handleGraphChange(event) {
   if (!appState.createGame) {
     return;
   }
 
-  if (event.target.closest(".graph-node")) {
-    return;
-  }
+  const target = event.target;
 
-  appState.drag = {
-    type: "pan",
-    startX: event.clientX,
-    startY: event.clientY,
-    originX: appState.graph.panX,
-    originY: appState.graph.panY,
-  };
-  refs.graphViewport.classList.add("dragging");
-  event.preventDefault();
-}
-
-function handleGraphWheel(event) {
-  if (appState.view !== "create") {
-    return;
-  }
-
-  event.preventDefault();
-
-  const factor = event.deltaY < 0 ? 1.08 : 1 / 1.08;
-  const oldZoom = appState.graph.zoom;
-  const nextZoom = clamp(oldZoom * factor, 0.45, 1.8);
-  const rect = refs.graphViewport.getBoundingClientRect();
-  const pointerX = event.clientX - rect.left;
-  const pointerY = event.clientY - rect.top;
-  const worldX = (pointerX - appState.graph.panX) / oldZoom;
-  const worldY = (pointerY - appState.graph.panY) / oldZoom;
-
-  appState.graph.zoom = nextZoom;
-  appState.graph.panX = pointerX - worldX * nextZoom;
-  appState.graph.panY = pointerY - worldY * nextZoom;
-  renderCreateView();
-}
-
-function handleDocumentDrag(event) {
-  if (!appState.drag || !appState.createGame) {
-    return;
-  }
-
-  if (appState.drag.type === "pan") {
-    appState.graph.panX = appState.drag.originX + (event.clientX - appState.drag.startX);
-    appState.graph.panY = appState.drag.originY + (event.clientY - appState.drag.startY);
-    applyGraphTransform();
-    refs.graphZoomLabel.textContent = `${Math.round(appState.graph.zoom * 100)}%`;
-    return;
-  }
-
-  if (appState.drag.type === "node") {
-    const node = getNodeById(appState.createGame, appState.drag.nodeId);
+  if (target.dataset.nodeField && target.dataset.nodeId) {
+    const node = getNodeById(appState.createGame, target.dataset.nodeId);
     if (!node) {
       return;
     }
 
-    node.position.x = clamp(
-      Math.round(appState.drag.originX + (event.clientX - appState.drag.startX) / appState.graph.zoom),
-      0,
-      GRAPH_WORLD_WIDTH - NODE_WIDTH - 40
-    );
-    node.position.y = clamp(
-      Math.round(appState.drag.originY + (event.clientY - appState.drag.startY) / appState.graph.zoom),
-      0,
-      GRAPH_WORLD_HEIGHT - 200
-    );
-    renderGraph(appState.createGame);
-  }
-}
-
-function handleDocumentDragEnd() {
-  if (!appState.drag) {
+    if (target.dataset.nodeField === "chapterId") {
+      moveNodeToChapter(node, target.value || null);
+    } else {
+      node[target.dataset.nodeField] = target.type === "checkbox" ? target.checked : target.value;
+    }
+    commitEditorChange();
     return;
   }
 
-  if (appState.drag.type === "node") {
-    persistEditorDraft();
+  if (target.dataset.paragraphField && target.dataset.nodeId && target.dataset.paragraphId) {
+    const node = getNodeById(appState.createGame, target.dataset.nodeId);
+    const paragraph = getParagraphById(node, target.dataset.paragraphId);
+    if (!paragraph) {
+      return;
+    }
+
+    paragraph[target.dataset.paragraphField] = target.value;
+    commitEditorChange();
+    return;
   }
 
-  appState.drag = null;
-  refs.graphViewport.classList.remove("dragging");
-}
+  if (target.dataset.optionField && target.dataset.nodeId && target.dataset.optionId) {
+    const node = getNodeById(appState.createGame, target.dataset.nodeId);
+    const option = getOptionById(node, target.dataset.optionId);
+    if (!option) {
+      return;
+    }
 
-function addChapter() {
-  const chapter = createChapter(`Chapter ${appState.createGame.chapters.length + 1}`);
-  appState.createGame.chapters.push(chapter);
-  commitEditorChange();
+    option[target.dataset.optionField] =
+      target.dataset.optionField === "targetNodeId" ? target.value || null : target.value;
+    if (target.dataset.optionField === "targetNodeId") {
+      option.targetClusterId = null;
+    }
+    commitEditorChange();
+  }
 }
 
 function deleteChapter(chapterId) {
@@ -2153,6 +3589,9 @@ function deleteChapter(chapterId) {
     }
   });
   appState.createGame.chapters = appState.createGame.chapters.filter((chapter) => chapter.id !== chapterId);
+  if (!fallback.startNodeId) {
+    fallback.startNodeId = appState.createGame.nodes.find((node) => node.chapterId === fallback.id)?.id || null;
+  }
   commitEditorChange();
 }
 
@@ -2160,6 +3599,27 @@ function addTracker() {
   const tracker = createTracker();
   tracker.groupId = appState.createGame.trackerGroups[0]?.id ?? null;
   appState.createGame.trackers.push(tracker);
+  appState.selection.trackerMenuId = null;
+  commitEditorChange();
+}
+
+function duplicateTracker(trackerId) {
+  const source = getTrackerById(appState.createGame, trackerId);
+  if (!source) {
+    return;
+  }
+
+  const tracker = createTracker();
+  tracker.name = `${source.name} Copy`;
+  tracker.startValue = source.startValue;
+  tracker.visible = source.visible;
+  tracker.min = source.min;
+  tracker.max = source.max;
+  tracker.direction = source.direction;
+  tracker.sign = source.sign;
+  tracker.groupId = source.groupId;
+  appState.createGame.trackers.push(tracker);
+  appState.selection.trackerMenuId = null;
   commitEditorChange();
 }
 
@@ -2188,19 +3648,167 @@ function addNodeAtViewportCenter() {
     return;
   }
 
-  const rect = refs.graphViewport.getBoundingClientRect();
-  const worldX = (rect.width / 2 - appState.graph.panX) / appState.graph.zoom;
-  const worldY = (rect.height / 2 - appState.graph.panY) / appState.graph.zoom;
+  const frame = getCanvasFocusFrame();
+  const worldX = (frame.originX + frame.width / 2 - appState.graph.panX) / appState.graph.zoom;
+  const worldY = (frame.originY + frame.height / 2 - appState.graph.panY) / appState.graph.zoom;
   const chapterId = appState.selection.nodeId
     ? getNodeById(appState.createGame, appState.selection.nodeId)?.chapterId
     : appState.createGame.chapters[0]?.id;
 
-  const node = createNode(chapterId);
+  const template = getNodeCreationTemplate(appState.createGame, appState.selection.nodeId);
+  const node = createNode(chapterId, undefined, template);
   node.position.x = clamp(Math.round(worldX - NODE_WIDTH / 2), 0, GRAPH_WORLD_WIDTH - NODE_WIDTH - 40);
   node.position.y = clamp(Math.round(worldY - 120), 0, GRAPH_WORLD_HEIGHT - 220);
   appState.createGame.nodes.push(node);
+  const chapter = getChapterById(appState.createGame, node.chapterId);
+  if (chapter && !chapter.startNodeId) {
+    chapter.startNodeId = node.id;
+  }
   appState.selection.nodeId = node.id;
+  appState.selection.paragraphId = null;
   appState.selection.optionId = null;
+  commitEditorChange();
+}
+
+function addClusterAtViewportCenter() {
+  if (!appState.createGame) {
+    return;
+  }
+
+  const frame = getCanvasFocusFrame();
+  const worldX = (frame.originX + frame.width / 2 - appState.graph.panX) / appState.graph.zoom;
+  const worldY = (frame.originY + frame.height / 2 - appState.graph.panY) / appState.graph.zoom;
+  const cluster = createCluster(`Cluster ${appState.createGame.clusters.length + 1}`);
+  cluster.position.x = clamp(Math.round(worldX - 64), 0, GRAPH_WORLD_WIDTH - 180);
+  cluster.position.y = clamp(Math.round(worldY - 32), 0, GRAPH_WORLD_HEIGHT - 120);
+  appState.createGame.clusters.push(cluster);
+  appState.selection.nodeId = null;
+  appState.selection.clusterId = cluster.id;
+  appState.selection.paragraphId = null;
+  appState.selection.optionId = null;
+  commitEditorChange();
+}
+
+function duplicateNode(nodeId) {
+  if (!appState.createGame) {
+    return;
+  }
+
+  const source = getNodeById(appState.createGame, nodeId);
+  if (!source) {
+    return;
+  }
+
+  const duplicate = createNode(source.chapterId, source.name, {
+    secondary: source.secondary,
+    time: source.time,
+    location: source.location,
+  });
+  duplicate.paragraphs = source.paragraphs.map(duplicateParagraphData);
+  duplicate.isEndpoint = source.isEndpoint;
+  duplicate.editorNotes = source.editorNotes;
+  duplicate.position.x = clamp(source.position.x + 44, 0, GRAPH_WORLD_WIDTH - NODE_WIDTH - 40);
+  duplicate.position.y = clamp(source.position.y + 44, 0, GRAPH_WORLD_HEIGHT - 220);
+  duplicate.options = source.options.map((option) => duplicateOption(option, source.id, duplicate.id));
+
+  appState.createGame.nodes.push(duplicate);
+  appState.selection.nodeId = duplicate.id;
+  appState.selection.paragraphId = null;
+  appState.selection.optionId = null;
+  appState.selection.nodeMenuId = null;
+  appState.selection.paragraphMenuId = null;
+  commitEditorChange();
+}
+
+function addParagraph(nodeId) {
+  const node = getNodeById(appState.createGame, nodeId);
+  if (!node) {
+    return;
+  }
+
+  const paragraph = createParagraph("New paragraph");
+  node.paragraphs.push(paragraph);
+  appState.selection.nodeId = node.id;
+  appState.selection.paragraphId = paragraph.id;
+  appState.selection.optionId = null;
+  appState.selection.paragraphMenuId = null;
+  commitEditorChange();
+}
+
+function duplicateParagraph(nodeId, paragraphId) {
+  const node = getNodeById(appState.createGame, nodeId);
+  const paragraph = getParagraphById(node, paragraphId);
+  if (!paragraph) {
+    return;
+  }
+
+  const duplicate = duplicateParagraphData(paragraph);
+  const index = node.paragraphs.findIndex((entry) => entry.id === paragraphId);
+  node.paragraphs.splice(index + 1, 0, duplicate);
+  appState.selection.nodeId = node.id;
+  appState.selection.paragraphId = duplicate.id;
+  appState.selection.optionId = null;
+  appState.selection.paragraphMenuId = null;
+  commitEditorChange();
+}
+
+function moveItemInArray(items, fromIndex, direction) {
+  const toIndex = fromIndex + direction;
+  if (fromIndex < 0 || toIndex < 0 || fromIndex >= items.length || toIndex >= items.length) {
+    return false;
+  }
+
+  const [item] = items.splice(fromIndex, 1);
+  items.splice(toIndex, 0, item);
+  return true;
+}
+
+function moveParagraph(nodeId, paragraphId, direction) {
+  const node = getNodeById(appState.createGame, nodeId);
+  if (!node) {
+    return;
+  }
+
+  const index = node.paragraphs.findIndex((paragraph) => paragraph.id === paragraphId);
+  if (!moveItemInArray(node.paragraphs, index, direction)) {
+    return;
+  }
+
+  appState.selection.nodeId = node.id;
+  appState.selection.paragraphId = paragraphId;
+  appState.selection.optionId = null;
+  appState.selection.paragraphMenuId = null;
+  commitEditorChange();
+}
+
+function deleteParagraph(nodeId, paragraphId) {
+  const node = getNodeById(appState.createGame, nodeId);
+  if (!node || node.paragraphs.length === 1) {
+    return;
+  }
+
+  node.paragraphs = node.paragraphs.filter((paragraph) => paragraph.id !== paragraphId);
+  appState.selection.nodeId = node.id;
+  appState.selection.paragraphId = node.paragraphs[0]?.id || null;
+  appState.selection.optionId = null;
+  appState.selection.paragraphMenuId = null;
+  commitEditorChange();
+}
+
+function moveOption(nodeId, optionId, direction) {
+  const node = getNodeById(appState.createGame, nodeId);
+  if (!node) {
+    return;
+  }
+
+  const index = node.options.findIndex((option) => option.id === optionId);
+  if (!moveItemInArray(node.options, index, direction)) {
+    return;
+  }
+
+  appState.selection.nodeId = node.id;
+  appState.selection.paragraphId = null;
+  appState.selection.optionId = optionId;
   commitEditorChange();
 }
 
@@ -2214,6 +3822,11 @@ function deleteSelectedNode() {
   const fallbackNode = remainingNodes[0];
 
   appState.createGame.nodes = remainingNodes;
+  appState.createGame.clusters.forEach((cluster) => {
+    if (cluster.targetNodeId === nodeId) {
+      cluster.targetNodeId = null;
+    }
+  });
   appState.createGame.nodes.forEach((node) => {
     node.options.forEach((option) => {
       if (option.targetNodeId === nodeId) {
@@ -2221,21 +3834,42 @@ function deleteSelectedNode() {
       }
     });
   });
-  if (appState.createGame.rootNodeId === nodeId) {
-    appState.createGame.rootNodeId = fallbackNode.id;
-  }
   appState.createGame.chapters.forEach((chapter) => {
     if (chapter.startNodeId === nodeId) {
-      chapter.startNodeId = fallbackNode.chapterId === chapter.id ? fallbackNode.id : null;
+      chapter.startNodeId =
+        appState.createGame.nodes.find((node) => node.chapterId === chapter.id)?.id ||
+        (fallbackNode.chapterId === chapter.id ? fallbackNode.id : null);
     }
   });
   appState.selection.nodeId = fallbackNode.id;
+  appState.selection.clusterId = null;
+  appState.selection.paragraphId = null;
   appState.selection.optionId = null;
+  appState.selection.nodeMenuId = null;
+  appState.selection.paragraphMenuId = null;
+  commitEditorChange();
+}
+
+function deleteSelectedCluster() {
+  if (!appState.createGame || !appState.selection.clusterId) {
+    return;
+  }
+
+  const clusterId = appState.selection.clusterId;
+  appState.createGame.clusters = appState.createGame.clusters.filter((cluster) => cluster.id !== clusterId);
+  appState.createGame.nodes.forEach((node) => {
+    node.options.forEach((option) => {
+      if (option.targetClusterId === clusterId) {
+        option.targetClusterId = null;
+      }
+    });
+  });
+  appState.selection.clusterId = null;
   commitEditorChange();
 }
 
 function centerGraph() {
-  if (!appState.createGame || !appState.createGame.nodes.length) {
+  if (!appState.createGame || (!appState.createGame.nodes.length && !appState.createGame.clusters.length)) {
     appState.graph.panX = 140;
     appState.graph.panY = 110;
     appState.graph.zoom = 1;
@@ -2243,17 +3877,17 @@ function centerGraph() {
     return;
   }
 
-  const bounds = getGraphBounds(appState.createGame.nodes);
-  const rect = refs.graphViewport.getBoundingClientRect();
-  const availableWidth = rect.width || 900;
-  const availableHeight = rect.height || 600;
+  const bounds = getGraphBounds([...appState.createGame.nodes, ...appState.createGame.clusters]);
+  const frame = getCanvasFocusFrame();
+  const availableWidth = frame.width || 900;
+  const availableHeight = frame.height || 600;
   const zoomX = availableWidth / Math.max(bounds.maxX - bounds.minX + 220, 1);
   const zoomY = availableHeight / Math.max(bounds.maxY - bounds.minY + 180, 1);
   appState.graph.zoom = clamp(Math.min(1, zoomX, zoomY), 0.45, 1.2);
   appState.graph.panX =
-    availableWidth / 2 - ((bounds.minX + bounds.maxX) / 2 + NODE_WIDTH / 2) * appState.graph.zoom;
+    frame.originX + availableWidth / 2 - ((bounds.minX + bounds.maxX) / 2 + NODE_WIDTH / 2) * appState.graph.zoom;
   appState.graph.panY =
-    availableHeight / 2 - ((bounds.minY + bounds.maxY) / 2 + 80) * appState.graph.zoom;
+    frame.originY + availableHeight / 2 - ((bounds.minY + bounds.maxY) / 2 + 80) * appState.graph.zoom;
   renderCreateView();
 }
 
@@ -2264,6 +3898,72 @@ function zoomGraph(factor) {
 
 function applyGraphTransform() {
   refs.graphWorld.style.transform = `translate(${appState.graph.panX}px, ${appState.graph.panY}px) scale(${appState.graph.zoom})`;
+}
+
+function getCanvasFocusFrame() {
+  const rect = refs.graphViewport.getBoundingClientRect();
+  const leftPanelRect = refs.graphViewport.querySelector(".create-panel-left")?.getBoundingClientRect();
+  const rightPanelVisible = !refs.editorInspectorShell.classList.contains("hidden");
+  const rightPanelRect = rightPanelVisible
+    ? refs.graphViewport.querySelector(".create-panel-right")?.getBoundingClientRect()
+    : null;
+  const leftInset = leftPanelRect && leftPanelRect.width < rect.width * 0.6 ? leftPanelRect.width + 28 : 0;
+  const rightInset = rightPanelRect && rightPanelRect.width < rect.width * 0.45 ? rightPanelRect.width + 28 : 0;
+
+  return {
+    originX: leftInset,
+    originY: 0,
+    width: Math.max(rect.width - leftInset - rightInset, 320),
+    height: rect.height,
+  };
+}
+
+function moveNodeToChapter(node, nextChapterId) {
+  if (!appState.createGame || !nextChapterId || node.chapterId === nextChapterId) {
+    return;
+  }
+
+  const previousChapter = getChapterById(appState.createGame, node.chapterId);
+  node.chapterId = nextChapterId;
+
+  if (previousChapter?.startNodeId === node.id) {
+    previousChapter.startNodeId =
+      appState.createGame.nodes.find((entry) => entry.id !== node.id && entry.chapterId === previousChapter.id)?.id ||
+      null;
+  }
+
+  const nextChapter = getChapterById(appState.createGame, nextChapterId);
+  if (nextChapter && !nextChapter.startNodeId) {
+    nextChapter.startNodeId = node.id;
+  }
+}
+
+function getNodeCreationTemplate(game, sourceNodeId) {
+  const sourceNode =
+    getNodeById(game, sourceNodeId) ||
+    [...game.nodes].reverse().find((node) => node.time || node.location) ||
+    null;
+
+  if (!sourceNode) {
+    return { secondary: "", time: "", location: "" };
+  }
+
+  return {
+    secondary: "",
+    time: sourceNode.time ? addMinutesToTimeString(sourceNode.time, 3) : "",
+    location: sourceNode.location || "",
+  };
+}
+
+function getGameStartNodeId(game) {
+  const firstChapter = game?.chapters?.[0];
+  if (firstChapter?.startNodeId && getNodeById(game, firstChapter.startNodeId)) {
+    return firstChapter.startNodeId;
+  }
+  if (game?.rootNodeId && getNodeById(game, game.rootNodeId)) {
+    return game.rootNodeId;
+  }
+  return game?.nodes?.[0]?.id || null;
 }
 
 function withSelectedNode(mutator) {
@@ -2286,6 +3986,15 @@ function withSelectedOption(mutator) {
   });
 }
 
+function withSelectedParagraph(mutator) {
+  withSelectedNode((node, game) => {
+    const paragraph = getParagraphById(node, appState.selection.paragraphId);
+    if (paragraph) {
+      mutator(paragraph, game, node);
+    }
+  });
+}
+
 function commitEditorChange() {
   normalizeEditorSelection();
   persistEditorDraft();
@@ -2295,41 +4004,69 @@ function commitEditorChange() {
 function normalizeEditorSelection() {
   if (!appState.createGame) {
     appState.selection.nodeId = null;
+    appState.selection.clusterId = null;
+    appState.selection.paragraphId = null;
     appState.selection.optionId = null;
+    appState.selection.nodeMenuId = null;
+    appState.selection.paragraphMenuId = null;
     return;
   }
 
   if (!getNodeById(appState.createGame, appState.selection.nodeId)) {
-    appState.selection.nodeId = appState.createGame.rootNodeId || appState.createGame.nodes[0]?.id || null;
+    appState.selection.nodeId = appState.selection.clusterId ? null : getGameStartNodeId(appState.createGame);
+    appState.selection.paragraphId = null;
     appState.selection.optionId = null;
+    appState.selection.nodeMenuId = null;
+    appState.selection.paragraphMenuId = null;
+  }
+
+  if (appState.selection.clusterId && !getClusterById(appState.createGame, appState.selection.clusterId)) {
+    appState.selection.clusterId = null;
   }
 
   const node = getNodeById(appState.createGame, appState.selection.nodeId);
+  if (!node || !getParagraphById(node, appState.selection.paragraphId)) {
+    appState.selection.paragraphId = null;
+  }
   if (!node || !getOptionById(node, appState.selection.optionId)) {
     appState.selection.optionId = null;
+  }
+  if (appState.selection.nodeMenuId && !getNodeById(appState.createGame, appState.selection.nodeMenuId)) {
+    appState.selection.nodeMenuId = null;
+  }
+  if (appState.selection.paragraphMenuId) {
+    const [nodeId, paragraphId] = appState.selection.paragraphMenuId.split(":");
+    if (!getParagraphById(getNodeById(appState.createGame, nodeId), paragraphId)) {
+      appState.selection.paragraphMenuId = null;
+    }
   }
 }
 
 function createGameScaffold() {
   const chapter = createChapter("Chapter 1");
   const group = createTrackerGroup("Core");
-  const rootNode = createNode(chapter.id, "root");
-  chapter.startNodeId = rootNode.id;
+  const openingNode = createNode(chapter.id, "");
+  chapter.startNodeId = openingNode.id;
 
   return {
     format: GAME_FORMAT,
     version: GAME_VERSION,
     metadata: {
-      id: `game-${Date.now().toString(36)}`,
       name: "Untitled Game",
       description: "",
     },
-    rootNodeId: rootNode.id,
+    world: {
+      clockFormat: "24",
+      locations: [],
+    },
     chapters: [chapter],
     trackerGroups: [group],
     trackers: [],
     flags: [],
-    nodes: [rootNode],
+    profiles: [],
+    strings: [],
+    clusters: [],
+    nodes: [openingNode],
   };
 }
 
@@ -2341,13 +4078,15 @@ function createChapter(name = "New Chapter") {
   };
 }
 
-function createNode(chapterId, name = "new_message") {
+function createNode(chapterId, name = "", template = {}) {
   return {
     id: createId("node"),
     name,
     chapterId,
-    secondary: "",
-    body: "Write the system message here.",
+    secondary: template.secondary || "",
+    time: template.time || "",
+    location: template.location || "",
+    paragraphs: [createParagraph("Write the system message here.")],
     position: {
       x: 160,
       y: 140,
@@ -2358,11 +4097,24 @@ function createNode(chapterId, name = "new_message") {
   };
 }
 
+function createCluster(name = "Cluster") {
+  return {
+    id: createId("cluster"),
+    name,
+    targetNodeId: null,
+    position: {
+      x: 240,
+      y: 200,
+    },
+  };
+}
+
 function createOption() {
   return {
     id: createId("option"),
     text: "New option",
     targetNodeId: null,
+    targetClusterId: null,
     terminal: "target",
     failureMode: "disabled",
     requirementDisplayMode: "none",
@@ -2370,8 +4122,44 @@ function createOption() {
     effectDisplayMode: "none",
     effectDisplayText: "",
     requirements: [],
-    trackerEffects: [],
-    flagEffects: [],
+    variableEffects: [],
+  };
+}
+
+function createParagraph(text = "Write the system message here.") {
+  return {
+    id: createId("paragraph"),
+    text,
+    requirements: [],
+  };
+}
+
+function duplicateParagraphData(paragraph) {
+  return {
+    id: createId("paragraph"),
+    text: paragraph.text,
+    requirements: paragraph.requirements.map((requirement) => ({ ...clone(requirement), id: createId("req") })),
+  };
+}
+
+function getParagraphById(node, paragraphId) {
+  return node?.paragraphs?.find((paragraph) => paragraph.id === paragraphId) || null;
+}
+
+function buildParagraphMenuKey(nodeId, paragraphId) {
+  return `${nodeId}:${paragraphId}`;
+}
+
+function duplicateOption(option, sourceNodeId, duplicateNodeId) {
+  return {
+    ...clone(option),
+    id: createId("option"),
+    targetNodeId:
+      option.targetNodeId === sourceNodeId
+        ? duplicateNodeId
+        : option.targetNodeId,
+    requirements: option.requirements.map((requirement) => ({ ...clone(requirement), id: createId("req") })),
+    variableEffects: option.variableEffects.map((effect) => ({ ...clone(effect), id: createId("ve") })),
   };
 }
 
@@ -2379,6 +4167,7 @@ function createTrackerRequirement(targetId, id = createId("req")) {
   return {
     id,
     kind: "tracker",
+    joinMode: "and",
     targetId,
     operator: ">=",
     value: 0,
@@ -2390,6 +4179,19 @@ function createFlagRequirement(targetId, id = createId("req")) {
   return {
     id,
     kind: "flag",
+    joinMode: "and",
+    targetId,
+    operator: "=",
+    value: 0,
+    state: null,
+  };
+}
+
+function createProfileRequirement(targetId, id = createId("req")) {
+  return {
+    id,
+    kind: "profile",
+    joinMode: "and",
     targetId,
     operator: "=",
     value: 0,
@@ -2413,11 +4215,35 @@ function createFlagEffect(flagId) {
   };
 }
 
+function createVariableEffect(variableType = "tracker", variableId = null, id = createId("ve")) {
+  return {
+    id,
+    action: "set",
+    variableType,
+    variableId,
+    value: variableType === "flag" || variableType === "profile" ? null : variableType === "string" ? "" : 0,
+  };
+}
+
+function getFirstVariableId(game, variableType) {
+  if (variableType === "flag") {
+    return game.flags[0]?.id ?? null;
+  }
+  if (variableType === "profile") {
+    return game.profiles[0]?.id ?? null;
+  }
+  if (variableType === "string") {
+    return game.strings[0]?.id ?? null;
+  }
+  return game.trackers[0]?.id ?? null;
+}
+
 function createTracker() {
   return {
     id: createId("tracker"),
-    name: "New Tracker",
+    name: "New Integer",
     startValue: 0,
+    visible: true,
     min: null,
     max: null,
     direction: "both",
@@ -2436,8 +4262,35 @@ function createTrackerGroup(name = "New Group") {
 function createFlag() {
   return {
     id: createId("flag"),
-    name: "New Flag",
+    name: "New Enum",
+    visible: false,
     states: ["set"],
+  };
+}
+
+function createProfile(name = "New Profile") {
+  return {
+    id: createId("profile"),
+    name,
+    visible: false,
+    startState: null,
+    states: [createProfileState("default")],
+  };
+}
+
+function createProfileState(name = "State") {
+  return {
+    id: createId("profile-state"),
+    name,
+    mappings: [],
+  };
+}
+
+function createStringVariable() {
+  return {
+    id: createId("string"),
+    name: "New String",
+    startValue: "",
   };
 }
 
@@ -2446,15 +4299,36 @@ function normalizeGame(rawGame) {
     return createGameScaffold();
   }
 
+  const rawTrackerGroups = Array.isArray(rawGame.integerGroups)
+    ? rawGame.integerGroups
+    : Array.isArray(rawGame.trackerGroups)
+      ? rawGame.trackerGroups
+      : [];
+  const rawTrackers = Array.isArray(rawGame.integers)
+    ? rawGame.integers
+    : Array.isArray(rawGame.trackers)
+      ? rawGame.trackers
+      : [];
+  const rawFlags = Array.isArray(rawGame.enums)
+    ? rawGame.enums
+    : Array.isArray(rawGame.flags)
+      ? rawGame.flags
+      : [];
+  const rawProfiles = Array.isArray(rawGame.profiles) ? rawGame.profiles : [];
+
   const normalized = {
     format: rawGame.format || GAME_FORMAT,
     version: rawGame.version || GAME_VERSION,
     metadata: {
-      id: rawGame.metadata?.id || `game-${Date.now().toString(36)}`,
       name: rawGame.metadata?.name || "Untitled Game",
       description: rawGame.metadata?.description || "",
     },
-    rootNodeId: rawGame.rootNodeId || null,
+    world: {
+      clockFormat: rawGame.world?.clockFormat === "12" ? "12" : "24",
+      locations: Array.isArray(rawGame.world?.locations)
+        ? rawGame.world.locations.filter((location) => typeof location === "string" && location.trim()).map((location) => location.trim())
+        : [],
+    },
     chapters: Array.isArray(rawGame.chapters)
       ? rawGame.chapters.map((chapter, index) => ({
           id: chapter?.id || createId("chapter"),
@@ -2462,17 +4336,18 @@ function normalizeGame(rawGame) {
           startNodeId: chapter?.startNodeId || null,
         }))
       : [],
-    trackerGroups: Array.isArray(rawGame.trackerGroups)
-      ? rawGame.trackerGroups.map((group, index) => ({
+    trackerGroups: rawTrackerGroups.length
+      ? rawTrackerGroups.map((group, index) => ({
           id: group?.id || createId("group"),
           name: group?.name || `Group ${index + 1}`,
         }))
       : [],
-    trackers: Array.isArray(rawGame.trackers)
-      ? rawGame.trackers.map((tracker) => ({
+    trackers: rawTrackers.length
+        ? rawTrackers.map((tracker) => ({
           id: tracker?.id || createId("tracker"),
-          name: tracker?.name || "Untitled Tracker",
+          name: tracker?.name || "Untitled Integer",
           startValue: parseNumberOrFallback(tracker?.startValue, 0),
+          visible: tracker?.visible !== false,
           min: parseNullableNumber(tracker?.min),
           max: parseNullableNumber(tracker?.max),
           direction: DIRECTION_OPTIONS.some((item) => item.value === tracker?.direction)
@@ -2482,15 +4357,25 @@ function normalizeGame(rawGame) {
           groupId: tracker?.groupId || null,
         }))
       : [],
-    flags: Array.isArray(rawGame.flags)
-      ? rawGame.flags.map((flag) => ({
+    flags: rawFlags.length
+        ? rawFlags.map((flag) => ({
           id: flag?.id || createId("flag"),
-          name: flag?.name || "Untitled Flag",
+          name: flag?.name || "Untitled Enum",
+          visible: Boolean(flag?.visible),
           states: Array.isArray(flag?.states)
             ? flag.states.filter((state) => typeof state === "string" && state.length)
             : [],
         }))
       : [],
+    profiles: rawProfiles.length ? rawProfiles.map(normalizeProfile) : [],
+    strings: Array.isArray(rawGame.strings)
+      ? rawGame.strings.map((entry) => ({
+          id: entry?.id || createId("string"),
+          name: entry?.name || "Untitled String",
+          startValue: typeof entry?.startValue === "string" ? entry.startValue : "",
+        }))
+      : [],
+    clusters: Array.isArray(rawGame.clusters) ? rawGame.clusters.map(normalizeCluster) : [],
     nodes: Array.isArray(rawGame.nodes)
       ? rawGame.nodes.map((node, index) => normalizeNode(node, index, rawGame))
       : [],
@@ -2501,14 +4386,9 @@ function normalizeGame(rawGame) {
   }
 
   if (!normalized.nodes.length) {
-    const node = createNode(normalized.chapters[0].id, "root");
+    const node = createNode(normalized.chapters[0].id, "");
     normalized.nodes.push(node);
-    normalized.rootNodeId = node.id;
     normalized.chapters[0].startNodeId = node.id;
-  }
-
-  if (!normalized.rootNodeId || !getNodeById(normalized, normalized.rootNodeId)) {
-    normalized.rootNodeId = normalized.nodes[0].id;
   }
 
   normalized.nodes.forEach((node, index) => {
@@ -2531,12 +4411,18 @@ function normalizeGame(rawGame) {
 }
 
 function normalizeNode(node, index, rawGame) {
+  const paragraphs = Array.isArray(node?.paragraphs)
+    ? node.paragraphs.map((paragraph, paragraphIndex) => normalizeParagraph(paragraph, node, paragraphIndex))
+    : [normalizeParagraph({ text: node?.body || "" }, node, 0)];
+
   return {
     id: node?.id || createId("node"),
-    name: node?.name || `message_${index + 1}`,
+    name: typeof node?.name === "string" ? node.name : "",
     chapterId: node?.chapterId || rawGame?.chapters?.[0]?.id || null,
     secondary: node?.secondary || "",
-    body: node?.body || "",
+    time: typeof node?.time === "string" ? node.time : "",
+    location: typeof node?.location === "string" ? node.location : "",
+    paragraphs,
     position: {
       x: parseNumberOrFallback(node?.position?.x, 120 + index * 36),
       y: parseNumberOrFallback(node?.position?.y, 120 + index * 28),
@@ -2547,11 +4433,100 @@ function normalizeNode(node, index, rawGame) {
   };
 }
 
+function normalizeProfile(profile, index) {
+  const states = Array.isArray(profile?.states) ? profile.states.map(normalizeProfileState) : [];
+  const startState =
+    typeof profile?.startState === "string" || profile?.startState === null ? profile.startState ?? null : null;
+
+  return {
+    id: profile?.id || createId("profile"),
+    name: profile?.name || `Profile ${index + 1}`,
+    visible: Boolean(profile?.visible),
+    startState: states.some((state) => state.name === startState) ? startState : null,
+    states,
+  };
+}
+
+function normalizeProfileState(state, index) {
+  const rawMappings = Array.isArray(state?.setVariables)
+    ? state.setVariables
+    : Array.isArray(state?.mappings)
+      ? state.mappings
+      : Array.isArray(state?.variableEffects)
+        ? state.variableEffects
+        : [];
+
+  return {
+    id: state?.id || createId("profile-state"),
+    name: state?.name || `State ${index + 1}`,
+    mappings: rawMappings.map((effect) => ({
+      id: effect?.id || createId("ve"),
+      action: effect?.action || "set",
+      variableType: effect?.variableType || "tracker",
+      variableId: effect?.variableId || null,
+      value:
+        effect?.value ??
+        (effect?.variableType === "string" ? "" : effect?.variableType === "flag" || effect?.variableType === "profile" ? null : 0),
+    })),
+  };
+}
+
+function normalizeParagraph(paragraph, node, index) {
+  const rawRequirements = Array.isArray(paragraph?.variableChecks)
+    ? paragraph.variableChecks
+    : Array.isArray(paragraph?.requirements)
+      ? paragraph.requirements
+      : [];
+
+  return {
+    id: paragraph?.id || createId("paragraph"),
+    text: typeof paragraph?.text === "string" ? paragraph.text : index === 0 ? node?.body || "" : "",
+    requirements: rawRequirements.length
+      ? rawRequirements
+          .map((requirement) =>
+            requirement?.kind === "flag"
+              ? createFlagRequirement(requirement.targetId || null, requirement.id || createId("req"))
+              : requirement?.kind === "profile"
+                ? createProfileRequirement(requirement.targetId || null, requirement.id || createId("req"))
+              : createTrackerRequirement(requirement.targetId || null, requirement.id || createId("req"))
+          )
+          .map((requirement, requirementIndex) => normalizeRequirement(requirement, rawRequirements[requirementIndex]))
+      : [],
+  };
+}
+
 function normalizeOption(option) {
+  const rawRequirements = Array.isArray(option?.variableChecks)
+    ? option.variableChecks
+    : Array.isArray(option?.requirements)
+      ? option.requirements
+      : [];
+  const legacyVariableEffects = [
+    ...(Array.isArray(option?.trackerEffects)
+      ? option.trackerEffects.map((effect) => ({
+          id: effect?.id || createId("ve"),
+          action: parseNumberOrFallback(effect?.delta, 0) < 0 ? "decrease" : "increase",
+          variableType: "tracker",
+          variableId: effect?.trackerId || null,
+          value: Math.abs(parseNumberOrFallback(effect?.delta, 0)),
+        }))
+      : []),
+    ...(Array.isArray(option?.flagEffects)
+      ? option.flagEffects.map((effect) => ({
+          id: effect?.id || createId("ve"),
+          action: "set",
+          variableType: "flag",
+          variableId: effect?.flagId || null,
+          value: effect?.state ?? null,
+        }))
+      : []),
+  ];
+
   return {
     id: option?.id || createId("option"),
     text: option?.text || "Untitled option",
     targetNodeId: option?.targetNodeId || null,
+    targetClusterId: option?.targetClusterId || null,
     terminal: TERMINAL_OPTIONS.some((item) => item.value === option?.terminal) ? option.terminal : "target",
     failureMode: FAILURE_OPTIONS.some((item) => item.value === option?.failureMode)
       ? option.failureMode
@@ -2564,33 +4539,53 @@ function normalizeOption(option) {
       ? option.effectDisplayMode
       : "none",
     effectDisplayText: option?.effectDisplayText || "",
-    requirements: Array.isArray(option?.requirements)
-      ? option.requirements.map((requirement) =>
+    requirements: rawRequirements.length
+      ? rawRequirements.map((requirement) =>
           requirement?.kind === "flag"
             ? createFlagRequirement(requirement.targetId || null, requirement.id || createId("req"))
+            : requirement?.kind === "profile"
+              ? createProfileRequirement(requirement.targetId || null, requirement.id || createId("req"))
             : createTrackerRequirement(requirement.targetId || null, requirement.id || createId("req"))
-        ).map((requirement, index) => normalizeRequirement(requirement, option.requirements[index]))
+        ).map((requirement, index) => normalizeRequirement(requirement, rawRequirements[index]))
       : [],
-    trackerEffects: Array.isArray(option?.trackerEffects)
-      ? option.trackerEffects.map((effect) => ({
-          id: effect?.id || createId("te"),
-          trackerId: effect?.trackerId || null,
-          delta: parseNumberOrFallback(effect?.delta, 0),
+    variableEffects: Array.isArray(option?.setVariables)
+      ? option.setVariables.map((effect) => ({
+          id: effect?.id || createId("ve"),
+          action: effect?.action || "set",
+          variableType: effect?.variableType || "tracker",
+          variableId: effect?.variableId || null,
+          value: effect?.value ?? (effect?.variableType === "string" ? "" : 0),
         }))
-      : [],
-    flagEffects: Array.isArray(option?.flagEffects)
-      ? option.flagEffects.map((effect) => ({
-          id: effect?.id || createId("fe"),
-          flagId: effect?.flagId || null,
-          state: effect?.state ?? null,
+      : Array.isArray(option?.variableEffects)
+        ? option.variableEffects.map((effect) => ({
+          id: effect?.id || createId("ve"),
+          action: effect?.action || "set",
+          variableType: effect?.variableType || "tracker",
+          variableId: effect?.variableId || null,
+          value: effect?.value ?? (effect?.variableType === "string" ? "" : 0),
         }))
-      : [],
+        : legacyVariableEffects,
+  };
+}
+
+function normalizeCluster(cluster, index) {
+  return {
+    id: cluster?.id || createId("cluster"),
+    name: cluster?.name || `Cluster ${index + 1}`,
+    targetNodeId: cluster?.targetNodeId || null,
+    position: {
+      x: parseNumberOrFallback(cluster?.position?.x, 220 + index * 30),
+      y: parseNumberOrFallback(cluster?.position?.y, 180 + index * 22),
+    },
   };
 }
 
 function normalizeRequirement(baseRequirement, rawRequirement) {
   return {
     ...baseRequirement,
+    joinMode: REQUIREMENT_JOIN_OPTIONS.some((option) => option.value === rawRequirement?.joinMode)
+      ? rawRequirement.joinMode
+      : baseRequirement.joinMode,
     operator: TRACKER_OPERATORS.includes(rawRequirement?.operator) ? rawRequirement.operator : baseRequirement.operator,
     value: parseNumberOrFallback(rawRequirement?.value, baseRequirement.value),
     state: rawRequirement?.state ?? baseRequirement.state,
@@ -2600,25 +4595,22 @@ function normalizeRequirement(baseRequirement, rawRequirement) {
 function validateGame(game) {
   const issues = [];
 
-  if (!game.metadata.id) {
-    issues.push(makeIssue("error", "Game metadata is missing an identifier."));
-  }
   if (!game.metadata.name) {
     issues.push(makeIssue("error", "Game metadata is missing a name."));
   }
-  if (!game.rootNodeId) {
-    issues.push(makeIssue("error", "The game is missing a root message."));
-  } else if (!getNodeById(game, game.rootNodeId)) {
-    issues.push(makeIssue("error", "The configured root message does not exist."));
-  }
   if (!game.chapters.length) {
     issues.push(makeIssue("error", "The game has no chapters."));
+  } else if (!getGameStartNodeId(game)) {
+    issues.push(makeIssue("error", "The game does not have a valid opening message."));
   }
 
   collectDuplicateIssues(game.nodes, "name", "message name", issues);
   collectDuplicateIssues(game.chapters, "id", "chapter id", issues);
-  collectDuplicateIssues(game.trackers, "id", "tracker id", issues);
-  collectDuplicateIssues(game.flags, "id", "flag id", issues);
+  collectDuplicateIssues(game.trackers, "id", "integer id", issues);
+  collectDuplicateIssues(game.flags, "id", "enum id", issues);
+  collectDuplicateIssues(game.profiles, "id", "profile id", issues);
+  collectDuplicateIssues(game.strings, "id", "string id", issues);
+  collectDuplicateVariableNameIssues(game, issues);
 
   game.chapters.forEach((chapter) => {
     const chapterNodes = game.nodes.filter((node) => node.chapterId === chapter.id);
@@ -2645,31 +4637,121 @@ function validateGame(game) {
 
   game.trackers.forEach((tracker) => {
     if (tracker.min !== null && tracker.max !== null && tracker.min > tracker.max) {
-      issues.push(makeIssue("error", `Tracker "${tracker.name}" has a minimum above its maximum.`, tracker.id));
+      issues.push(makeIssue("error", `Integer "${tracker.name}" has a minimum above its maximum.`, tracker.id));
     }
     if (tracker.min !== null && tracker.startValue < tracker.min) {
-      issues.push(makeIssue("error", `Tracker "${tracker.name}" starts below its minimum.`, tracker.id));
+      issues.push(makeIssue("error", `Integer "${tracker.name}" starts below its minimum.`, tracker.id));
     }
     if (tracker.max !== null && tracker.startValue > tracker.max) {
-      issues.push(makeIssue("error", `Tracker "${tracker.name}" starts above its maximum.`, tracker.id));
+      issues.push(makeIssue("error", `Integer "${tracker.name}" starts above its maximum.`, tracker.id));
     }
     if (tracker.sign === "nonNegative" && tracker.startValue < 0) {
-      issues.push(makeIssue("error", `Tracker "${tracker.name}" cannot start negative.`, tracker.id));
+      issues.push(makeIssue("error", `Integer "${tracker.name}" cannot start negative.`, tracker.id));
     }
     if (tracker.sign === "nonPositive" && tracker.startValue > 0) {
-      issues.push(makeIssue("error", `Tracker "${tracker.name}" cannot start positive.`, tracker.id));
+      issues.push(makeIssue("error", `Integer "${tracker.name}" cannot start positive.`, tracker.id));
     }
+  });
+
+  game.strings.forEach((entry) => {
+    if (!entry.name.trim()) {
+      issues.push(makeIssue("error", "A string variable is missing a name.", entry.id));
+    }
+  });
+
+  game.profiles.forEach((profile) => {
+    if (!profile.name.trim()) {
+      issues.push(makeIssue("error", "A profile variable is missing a name.", profile.id));
+    }
+    if (profile.startState !== null && !profile.states.some((state) => state.name === profile.startState)) {
+      issues.push(makeIssue("error", `Profile "${profile.name}" starts in a missing state.`, profile.id));
+    }
+    collectDuplicateIssues(profile.states, "name", `state name in profile "${profile.name}"`, issues);
+    profile.states.forEach((state) => {
+      if (!state.name.trim()) {
+        issues.push(makeIssue("error", `Profile "${profile.name}" has an unnamed state.`, profile.id));
+      }
+      state.mappings.forEach((effect) => {
+        if (effect.variableType === "tracker") {
+          const tracker = getTrackerById(game, effect.variableId);
+          if (!tracker) {
+            issues.push(makeIssue("error", `Profile "${profile.name}" changes a missing integer.`, profile.id));
+          }
+          return;
+        }
+        if (effect.variableType === "flag") {
+          const flag = getFlagById(game, effect.variableId);
+          if (!flag) {
+            issues.push(makeIssue("error", `Profile "${profile.name}" changes a missing enum.`, profile.id));
+          } else if (effect.value !== null && !flag.states.includes(effect.value)) {
+            issues.push(makeIssue("error", `Profile "${profile.name}" sets invalid enum state "${effect.value}".`, profile.id));
+          }
+          return;
+        }
+        if (effect.variableType === "profile") {
+          const targetProfile = getProfileById(game, effect.variableId);
+          if (!targetProfile) {
+            issues.push(makeIssue("error", `Profile "${profile.name}" changes a missing profile.`, profile.id));
+          } else if (effect.value !== null && !targetProfile.states.some((entry) => entry.name === effect.value)) {
+            issues.push(makeIssue("error", `Profile "${profile.name}" sets invalid profile state "${effect.value}".`, profile.id));
+          }
+          return;
+        }
+        if (!game.strings.find((entry) => entry.id === effect.variableId)) {
+          issues.push(makeIssue("error", `Profile "${profile.name}" changes a missing string.`, profile.id));
+        }
+      });
+    });
   });
 
   game.nodes.forEach((node) => {
     if (!getChapterById(game, node.chapterId)) {
       issues.push(makeIssue("error", `Message "${node.name}" is assigned to a missing chapter.`, node.id));
     }
+    node.paragraphs.forEach((paragraph) => {
+      paragraph.requirements.forEach((requirement) => {
+        if (requirement.kind === "tracker") {
+          const tracker = getTrackerById(game, requirement.targetId);
+          if (!tracker) {
+            issues.push(makeIssue("error", `A paragraph in "${node.name}" references a missing integer variable check.`, node.id));
+          }
+        } else if (requirement.kind === "profile") {
+          const profile = getProfileById(game, requirement.targetId);
+          if (!profile) {
+            issues.push(makeIssue("error", `A paragraph in "${node.name}" references a missing profile variable check.`, node.id));
+          } else if (requirement.state !== null && !profile.states.some((state) => state.name === requirement.state)) {
+            issues.push(makeIssue("error", `A paragraph in "${node.name}" checks invalid profile state "${requirement.state}".`, node.id));
+          }
+        } else {
+          const flag = getFlagById(game, requirement.targetId);
+          if (!flag) {
+            issues.push(makeIssue("error", `A paragraph in "${node.name}" references a missing enum variable check.`, node.id));
+          } else if (requirement.state !== null && !flag.states.includes(requirement.state)) {
+            issues.push(
+              makeIssue("error", `A paragraph in "${node.name}" checks invalid enum state "${requirement.state}".`, node.id)
+            );
+          }
+        }
+      });
+    });
     node.options.forEach((option) => {
       if (option.terminal === "target" && !option.targetNodeId) {
-        issues.push(makeIssue("error", `Option "${option.text}" has no target message.`, node.id));
+        if (!option.targetClusterId) {
+          issues.push(makeIssue("error", `Option "${option.text}" has no target message.`, node.id));
+        }
       }
-      if (option.terminal === "target" && option.targetNodeId && !getNodeById(game, option.targetNodeId)) {
+      if (option.terminal === "target" && option.targetClusterId && !getClusterById(game, option.targetClusterId)) {
+        issues.push(makeIssue("error", `Option "${option.text}" targets a missing cluster.`, node.id));
+      }
+      if (
+        option.terminal === "target" &&
+        option.targetClusterId &&
+        getClusterById(game, option.targetClusterId) &&
+        !resolveOptionTargetNodeId(game, option)
+      ) {
+        issues.push(makeIssue("error", `Option "${option.text}" targets a cluster with no target message.`, node.id));
+      }
+      if (option.terminal === "target" && resolveOptionTargetNodeId(game, option) && !getNodeById(game, resolveOptionTargetNodeId(game, option))) {
         issues.push(makeIssue("error", `Option "${option.text}" targets a missing message.`, node.id));
       }
 
@@ -2677,47 +4759,78 @@ function validateGame(game) {
         if (requirement.kind === "tracker") {
           const tracker = getTrackerById(game, requirement.targetId);
           if (!tracker) {
-            issues.push(makeIssue("error", `Option "${option.text}" references a missing tracker requirement.`, node.id));
+            issues.push(makeIssue("error", `Option "${option.text}" references a missing integer variable check.`, node.id));
+          }
+        } else if (requirement.kind === "profile") {
+          const profile = getProfileById(game, requirement.targetId);
+          if (!profile) {
+            issues.push(makeIssue("error", `Option "${option.text}" references a missing profile variable check.`, node.id));
+          } else if (requirement.state !== null && !profile.states.some((state) => state.name === requirement.state)) {
+            issues.push(makeIssue("error", `Option "${option.text}" checks invalid profile state "${requirement.state}".`, node.id));
           }
         } else {
           const flag = getFlagById(game, requirement.targetId);
           if (!flag) {
-            issues.push(makeIssue("error", `Option "${option.text}" references a missing flag requirement.`, node.id));
+            issues.push(makeIssue("error", `Option "${option.text}" references a missing enum variable check.`, node.id));
           } else if (requirement.state !== null && !flag.states.includes(requirement.state)) {
             issues.push(
-              makeIssue("error", `Option "${option.text}" requires an invalid flag state "${requirement.state}".`, node.id)
+              makeIssue("error", `Option "${option.text}" checks invalid enum state "${requirement.state}".`, node.id)
             );
           }
         }
       });
 
-      option.trackerEffects.forEach((effect) => {
-        const tracker = getTrackerById(game, effect.trackerId);
-        if (!tracker) {
-          issues.push(makeIssue("error", `Option "${option.text}" changes a missing tracker.`, node.id));
+      option.variableEffects.forEach((effect) => {
+        if (effect.variableType === "tracker") {
+          const tracker = getTrackerById(game, effect.variableId);
+          if (!tracker) {
+            issues.push(makeIssue("error", `Option "${option.text}" changes a missing integer.`, node.id));
+            return;
+          }
+          const delta =
+            effect.action === "set"
+              ? 0
+              : effect.action === "decrease"
+                ? -Math.abs(parseNumberOrFallback(effect.value, 0))
+                : Math.abs(parseNumberOrFallback(effect.value, 0));
+          if (tracker.direction === "increase" && delta < 0) {
+            issues.push(makeIssue("warning", `Option "${option.text}" decreases integer "${tracker.name}" even though it only increases.`, node.id));
+          }
+          if (tracker.direction === "decrease" && delta > 0) {
+            issues.push(makeIssue("warning", `Option "${option.text}" increases integer "${tracker.name}" even though it only decreases.`, node.id));
+          }
           return;
         }
-        if (tracker.direction === "increase" && effect.delta < 0) {
-          issues.push(makeIssue("warning", `Option "${option.text}" decreases tracker "${tracker.name}" even though it only increases.`, node.id));
-        }
-        if (tracker.direction === "decrease" && effect.delta > 0) {
-          issues.push(makeIssue("warning", `Option "${option.text}" increases tracker "${tracker.name}" even though it only decreases.`, node.id));
-        }
-      });
 
-      option.flagEffects.forEach((effect) => {
-        const flag = getFlagById(game, effect.flagId);
-        if (!flag) {
-          issues.push(makeIssue("error", `Option "${option.text}" changes a missing flag.`, node.id));
-        } else if (effect.state !== null && !flag.states.includes(effect.state)) {
-          issues.push(makeIssue("error", `Option "${option.text}" sets invalid flag state "${effect.state}".`, node.id));
+        if (effect.variableType === "flag") {
+          const flag = getFlagById(game, effect.variableId);
+          if (!flag) {
+            issues.push(makeIssue("error", `Option "${option.text}" changes a missing enum.`, node.id));
+          } else if (effect.value !== null && !flag.states.includes(effect.value)) {
+            issues.push(makeIssue("error", `Option "${option.text}" sets invalid enum state "${effect.value}".`, node.id));
+          }
+          return;
+        }
+
+        if (effect.variableType === "profile") {
+          const profile = getProfileById(game, effect.variableId);
+          if (!profile) {
+            issues.push(makeIssue("error", `Option "${option.text}" changes a missing profile.`, node.id));
+          } else if (effect.value !== null && !profile.states.some((state) => state.name === effect.value)) {
+            issues.push(makeIssue("error", `Option "${option.text}" sets invalid profile state "${effect.value}".`, node.id));
+          }
+          return;
+        }
+
+        if (!game.strings.find((entry) => entry.id === effect.variableId)) {
+          issues.push(makeIssue("error", `Option "${option.text}" changes a missing string.`, node.id));
         }
       });
     });
   });
 
   getUnreachableNodes(game).forEach((node) => {
-    issues.push(makeIssue("warning", `Message "${node.name}" is unreachable from the game root.`, node.id));
+    issues.push(makeIssue("warning", `Message "${node.name}" is unreachable from the opening path.`, node.id));
   });
 
   return issues;
@@ -2725,7 +4838,7 @@ function validateGame(game) {
 
 function getUnreachableNodes(game) {
   const reachableIds = new Set();
-  const queue = [game.rootNodeId];
+  const queue = [getGameStartNodeId(game)];
 
   while (queue.length) {
     const nodeId = queue.shift();
@@ -2741,8 +4854,11 @@ function getUnreachableNodes(game) {
     reachableIds.add(nodeId);
 
     node.options.forEach((option) => {
-      if (option.terminal === "target" && option.targetNodeId) {
-        queue.push(option.targetNodeId);
+      if (option.terminal === "target") {
+        const targetNodeId = resolveOptionTargetNodeId(game, option);
+        if (targetNodeId) {
+          queue.push(targetNodeId);
+        }
       }
       if (option.terminal === "chapterEnd") {
         const nextChapter = getNextChapter(game, node.chapterId);
@@ -2773,12 +4889,43 @@ function collectDuplicateIssues(items, field, label, issues) {
   });
 }
 
+function collectDuplicateVariableNameIssues(game, issues) {
+  const seen = new Map();
+  const variables = [
+    ...game.trackers.map((entry) => ({ id: entry.id, kind: "integer", name: entry.name })),
+    ...game.flags.map((entry) => ({ id: entry.id, kind: "enum", name: entry.name })),
+    ...game.profiles.map((entry) => ({ id: entry.id, kind: "profile", name: entry.name })),
+    ...game.strings.map((entry) => ({ id: entry.id, kind: "string", name: entry.name })),
+  ];
+
+  variables.forEach((entry) => {
+    const key = String(entry.name || "").trim().toLowerCase();
+    if (!key) {
+      issues.push(makeIssue("error", `A ${entry.kind} variable is missing a name.`, entry.id));
+      return;
+    }
+
+    if (seen.has(key)) {
+      issues.push(
+        makeIssue(
+          "error",
+          `Variable name "${entry.name}" is used by more than one variable. Interpolated text requires unique variable names.`,
+          entry.id
+        )
+      );
+      return;
+    }
+
+    seen.set(key, true);
+  });
+}
+
 function makeIssue(severity, message, targetId = null) {
   return { severity, message, targetId };
 }
 
 function evaluateOptionAvailability(game, playState, option) {
-  const passes = option.requirements.every((requirement) => evaluateRequirement(game, playState, requirement));
+  const passes = evaluateRequirementSet(game, playState, option.requirements);
   if (passes) {
     return { state: "selectable" };
   }
@@ -2792,13 +4939,36 @@ function evaluateRequirement(game, playState, requirement) {
     return compareValues(current, requirement.operator, requirement.value);
   }
 
-  return playState.flags[requirement.targetId] === requirement.state;
+  if (requirement.kind === "profile") {
+    return compareValues(playState.profiles[requirement.targetId], requirement.operator || "=", requirement.state);
+  }
+
+  return compareValues(playState.flags[requirement.targetId], requirement.operator || "=", requirement.state);
+}
+
+function evaluateRequirementSet(game, playState, requirements) {
+  if (!requirements.length) {
+    return true;
+  }
+
+  const andRequirements = requirements.filter((requirement) => requirement.joinMode !== "or");
+  const orRequirements = requirements.filter((requirement) => requirement.joinMode === "or");
+  const andPasses = andRequirements.every((requirement) => evaluateRequirement(game, playState, requirement));
+  const orPasses = !orRequirements.length || orRequirements.some((requirement) => evaluateRequirement(game, playState, requirement));
+
+  return andPasses && orPasses;
+}
+
+function evaluateParagraphVisibility(game, playState, paragraph) {
+  return evaluateRequirementSet(game, playState, paragraph.requirements);
 }
 
 function compareValues(left, operator, right) {
   switch (operator) {
     case "=":
       return left === right;
+    case "!=":
+      return left !== right;
     case "<":
       return left < right;
     case ">":
@@ -2818,10 +4988,10 @@ function buildOptionInlineNote(game, playState, option) {
   const effectText = buildEffectDisplay(game, option);
 
   if (requirementText) {
-    parts.push(`Requires ${requirementText}`);
+    parts.push(option.requirementDisplayMode === "custom" ? requirementText : `Checks ${requirementText}`);
   }
   if (effectText) {
-    parts.push(`Effects ${effectText}`);
+    parts.push(option.effectDisplayMode === "custom" ? effectText : `Sets ${effectText}`);
   }
 
   return parts.join(" • ");
@@ -2835,26 +5005,58 @@ function buildRequirementDisplay(game, playState, option) {
     return option.requirementDisplayText;
   }
 
-  return option.requirements
-    .map((requirement) => {
-      if (requirement.kind === "tracker") {
-        const tracker = getTrackerById(game, requirement.targetId);
-        if (!tracker) {
-          return "";
-        }
+  const andParts = [];
+  const orParts = [];
 
-        const current = playState.trackers[tracker.id] ?? tracker.startValue;
-        if (requirement.operator === ">=" && tracker.max !== null) {
-          return `${tracker.name} ${current}/${requirement.value}`;
-        }
-        return `${tracker.name} ${formatPrettyOperator(requirement.operator)} ${requirement.value}`;
-      }
+  option.requirements.forEach((requirement) => {
+    const text = buildSingleRequirementDisplay(game, playState, requirement);
+    if (!text) {
+      return;
+    }
 
-      const flag = getFlagById(game, requirement.targetId);
-      return flag ? `${flag.name}: ${requirement.state === null ? "null" : requirement.state}` : "";
-    })
-    .filter(Boolean)
-    .join(", ");
+    if (requirement.joinMode === "or") {
+      orParts.push(text);
+    } else {
+      andParts.push(text);
+    }
+  });
+
+  const parts = [];
+  if (andParts.length) {
+    parts.push(andParts.length === 1 ? andParts[0] : `All: ${andParts.join(", ")}`);
+  }
+  if (orParts.length) {
+    parts.push(orParts.length === 1 ? `Any: ${orParts[0]}` : `Any: ${orParts.join(" or ")}`);
+  }
+
+  return parts.join("; ");
+}
+
+function buildSingleRequirementDisplay(game, playState, requirement) {
+  if (requirement.kind === "tracker") {
+    const tracker = getTrackerById(game, requirement.targetId);
+    if (!tracker || !tracker.visible) {
+      return "";
+    }
+
+    const current = playState.trackers[tracker.id] ?? tracker.startValue;
+    if (requirement.operator === ">=" && tracker.max !== null) {
+      return `${tracker.name} ${current}/${requirement.value}`;
+    }
+    return `${tracker.name} ${formatPrettyOperator(requirement.operator)} ${requirement.value}`;
+  }
+
+  if (requirement.kind === "profile") {
+    const profile = getProfileById(game, requirement.targetId);
+    return profile && profile.visible
+      ? `${profile.name} ${formatPrettyOperator(requirement.operator || "=")} ${requirement.state === null ? "null" : requirement.state}`
+      : "";
+  }
+
+  const flag = getFlagById(game, requirement.targetId);
+  return flag && flag.visible
+    ? `${flag.name} ${formatPrettyOperator(requirement.operator || "=")} ${requirement.state === null ? "null" : requirement.state}`
+    : "";
 }
 
 function buildEffectDisplay(game, option) {
@@ -2866,28 +5068,46 @@ function buildEffectDisplay(game, option) {
   }
 
   const parts = [];
-  option.trackerEffects.forEach((effect) => {
-    const tracker = getTrackerById(game, effect.trackerId);
-    if (!tracker) {
+  option.variableEffects.forEach((effect) => {
+    if (effect.variableType === "tracker") {
+      const tracker = getTrackerById(game, effect.variableId);
+      if (!tracker || !tracker.visible) {
+        return;
+      }
+
+      if (effect.action === "set") {
+        parts.push(`${tracker.name} = ${effect.value}`);
+      } else {
+        const delta = effect.action === "decrease" ? -Math.abs(effect.value) : Math.abs(effect.value);
+        parts.push(`${tracker.name} ${delta > 0 ? "+" : ""}${delta}`);
+      }
       return;
     }
 
-    if (effect.delta === 1) {
-      parts.push(`${tracker.name} +`);
-    } else if (effect.delta === -1) {
-      parts.push(`${tracker.name} -`);
-    } else {
-      parts.push(`${tracker.name} ${effect.delta > 0 ? "+" : ""}${effect.delta}`);
-    }
-  });
+    if (effect.variableType === "flag") {
+      const flag = getFlagById(game, effect.variableId);
+      if (!flag || !flag.visible) {
+        return;
+      }
 
-  option.flagEffects.forEach((effect) => {
-    const flag = getFlagById(game, effect.flagId);
-    if (!flag) {
+      parts.push(`${flag.name} -> ${effect.value === null ? "null" : effect.value}`);
       return;
     }
 
-    parts.push(`${flag.name} -> ${effect.state === null ? "null" : effect.state}`);
+    if (effect.variableType === "profile") {
+      const profile = getProfileById(game, effect.variableId);
+      if (!profile || !profile.visible) {
+        return;
+      }
+
+      parts.push(`${profile.name} -> ${effect.value === null ? "null" : effect.value}`);
+      return;
+    }
+
+    const entry = game.strings.find((item) => item.id === effect.variableId);
+    if (entry) {
+      parts.push(`${entry.name} -> ${effect.value}`);
+    }
   });
 
   return parts.join(", ");
@@ -2897,9 +5117,9 @@ function buildTrackerDisplayGroups(game) {
   const grouped = game.trackerGroups.map((group) => ({
     id: group.id,
     name: group.name || "Unnamed Group",
-    trackers: game.trackers.filter((tracker) => tracker.groupId === group.id),
+    trackers: game.trackers.filter((tracker) => tracker.visible && tracker.groupId === group.id),
   }));
-  const ungrouped = game.trackers.filter((tracker) => !tracker.groupId);
+  const ungrouped = game.trackers.filter((tracker) => tracker.visible && !tracker.groupId);
 
   if (ungrouped.length) {
     grouped.push({
@@ -2912,21 +5132,99 @@ function buildTrackerDisplayGroups(game) {
   return grouped.filter((group) => group.trackers.length);
 }
 
+function applyVariableEffect(game, playState, effect, profileStack = new Set()) {
+  if (effect.variableType === "tracker") {
+    const tracker = getTrackerById(game, effect.variableId);
+    if (!tracker) {
+      return;
+    }
+
+    if (effect.action === "set") {
+      playState.trackers[tracker.id] = sanitizeTrackerValue(tracker, parseNumberOrFallback(effect.value, 0));
+      return;
+    }
+
+    const delta = effect.action === "decrease" ? -Math.abs(parseNumberOrFallback(effect.value, 0)) : Math.abs(parseNumberOrFallback(effect.value, 0));
+    playState.trackers[tracker.id] = applyTrackerEffect(tracker, playState.trackers[tracker.id], delta);
+    return;
+  }
+
+  if (effect.variableType === "flag") {
+    if (!getFlagById(game, effect.variableId)) {
+      return;
+    }
+    playState.flags[effect.variableId] = effect.value ?? null;
+    return;
+  }
+
+  if (effect.variableType === "profile") {
+    setProfileState(game, playState, effect.variableId, effect.value ?? null, profileStack);
+    return;
+  }
+
+  const entry = game.strings.find((item) => item.id === effect.variableId);
+  if (entry) {
+    playState.strings[entry.id] = String(effect.value ?? "");
+  }
+}
+
+function applyProfileStartStates(game, playState) {
+  game.profiles.forEach((profile) => {
+    if (playState.profiles?.[profile.id] !== null && playState.profiles?.[profile.id] !== undefined) {
+      setProfileState(game, playState, profile.id, playState.profiles[profile.id], new Set());
+    }
+  });
+}
+
+function setProfileState(game, playState, profileId, stateName, profileStack = new Set()) {
+  const profile = getProfileById(game, profileId);
+  if (!profile) {
+    return;
+  }
+
+  playState.profiles[profile.id] = stateName ?? null;
+  if (stateName === null) {
+    return;
+  }
+
+  const state = getProfileStateByName(profile, stateName);
+  if (!state) {
+    playState.profiles[profile.id] = null;
+    return;
+  }
+
+  const stackKey = `${profile.id}:${state.name}`;
+  if (profileStack.has(stackKey)) {
+    return;
+  }
+
+  profileStack.add(stackKey);
+  state.mappings.forEach((mapping) => {
+    applyVariableEffect(game, playState, mapping, profileStack);
+  });
+  profileStack.delete(stackKey);
+}
+
 function createPlayState(game) {
+  const startNodeId = getGameStartNodeId(game);
   const state = {
     format: SAVE_FORMAT,
     version: GAME_VERSION,
-    gameId: game.metadata.id,
-    currentChapterId: getNodeById(game, game.rootNodeId)?.chapterId || game.chapters[0]?.id || null,
-    currentNodeId: game.rootNodeId,
+    gameId: getGameCacheKey(game),
+    currentChapterId: getNodeById(game, startNodeId)?.chapterId || game.chapters[0]?.id || null,
+    currentNodeId: startNodeId,
     trackers: Object.fromEntries(game.trackers.map((tracker) => [tracker.id, normalizeTrackerStart(tracker)])),
     flags: Object.fromEntries(game.flags.map((flag) => [flag.id, null])),
+    profiles: Object.fromEntries(game.profiles.map((profile) => [profile.id, profile.startState ?? null])),
+    strings: Object.fromEntries(game.strings.map((entry) => [entry.id, entry.startValue])),
     log: [],
     history: [],
     notes: "",
     status: "active",
     updatedAt: new Date().toISOString(),
   };
+
+  applyProfileStartStates(game, state);
 
   const startNode = getNodeById(game, state.currentNodeId);
   if (startNode) {
@@ -2937,7 +5235,7 @@ function createPlayState(game) {
     state.log.push({
       type: "event",
       label: "Runtime error",
-      text: "The configured root message could not be found.",
+      text: "The opening message could not be found.",
     });
   }
 
@@ -2949,22 +5247,29 @@ function normalizePlaySave(rawSave, game) {
     return null;
   }
 
+  const startNodeId = getGameStartNodeId(game);
   const state = {
     format: SAVE_FORMAT,
     version: rawSave.version || GAME_VERSION,
-    gameId: rawSave.gameId || game.metadata.id,
+    gameId: rawSave.gameId || getGameCacheKey(game),
     currentChapterId: rawSave.currentChapterId || getNodeById(game, rawSave.currentNodeId)?.chapterId || game.chapters[0]?.id || null,
-    currentNodeId: rawSave.currentNodeId || game.rootNodeId,
+    currentNodeId: rawSave.currentNodeId || startNodeId,
     trackers: Object.fromEntries(
       game.trackers.map((tracker) => [
         tracker.id,
-        typeof rawSave.trackers?.[tracker.id] === "number"
-          ? sanitizeTrackerValue(tracker, rawSave.trackers[tracker.id])
+        typeof (rawSave.integers?.[tracker.id] ?? rawSave.trackers?.[tracker.id]) === "number"
+          ? sanitizeTrackerValue(tracker, rawSave.integers?.[tracker.id] ?? rawSave.trackers?.[tracker.id])
           : normalizeTrackerStart(tracker),
       ])
     ),
     flags: Object.fromEntries(
-      game.flags.map((flag) => [flag.id, rawSave.flags?.[flag.id] ?? null])
+      game.flags.map((flag) => [flag.id, rawSave.enums?.[flag.id] ?? rawSave.flags?.[flag.id] ?? null])
+    ),
+    profiles: Object.fromEntries(
+      game.profiles.map((profile) => [profile.id, rawSave.profiles?.[profile.id] ?? profile.startState ?? null])
+    ),
+    strings: Object.fromEntries(
+      game.strings.map((entry) => [entry.id, typeof rawSave.strings?.[entry.id] === "string" ? rawSave.strings[entry.id] : entry.startValue])
     ),
     log: Array.isArray(rawSave.log) ? rawSave.log : [],
     history: Array.isArray(rawSave.history) ? rawSave.history : [],
@@ -2988,7 +5293,7 @@ function persistEditorDraft() {
     return;
   }
 
-  window.localStorage.setItem(EDITOR_DRAFT_KEY, JSON.stringify(appState.createGame));
+  window.localStorage.setItem(EDITOR_DRAFT_KEY, JSON.stringify(serializeGame(appState.createGame)));
 }
 
 function loadEditorDraft() {
@@ -3010,7 +5315,7 @@ function persistPlayCache() {
   }
 
   window.localStorage.setItem(
-    `${PLAY_CACHE_PREFIX}${appState.playGame.metadata.id}`,
+    `${PLAY_CACHE_PREFIX}${getGameCacheKey(appState.playGame)}`,
     JSON.stringify(appState.playState)
   );
 }
@@ -3028,8 +5333,121 @@ function loadPlayCache(gameId) {
   }
 }
 
+function serializeGame(game) {
+  const serialized = clone(game);
+  if (serialized.metadata) {
+    delete serialized.metadata.id;
+  }
+  delete serialized.rootNodeId;
+  serialized.integerGroups = serialized.trackerGroups ?? [];
+  serialized.integers = serialized.trackers ?? [];
+  serialized.enums = serialized.flags ?? [];
+  delete serialized.trackerGroups;
+  delete serialized.trackers;
+  delete serialized.flags;
+  serialized.nodes = (serialized.nodes || []).map((node) => ({
+    ...node,
+    paragraphs: (node.paragraphs || []).map((paragraph) => {
+      const nextParagraph = { ...paragraph, variableChecks: paragraph.requirements ?? [] };
+      delete nextParagraph.requirements;
+      return nextParagraph;
+    }),
+    options: (node.options || []).map((option) => {
+      const nextOption = {
+        ...option,
+        variableChecks: option.requirements ?? [],
+        setVariables: option.variableEffects ?? [],
+      };
+      delete nextOption.requirements;
+      delete nextOption.variableEffects;
+      delete nextOption.trackerEffects;
+      delete nextOption.flagEffects;
+      return nextOption;
+    }),
+  }));
+  serialized.profiles = (serialized.profiles || []).map((profile) => ({
+    ...profile,
+    states: (profile.states || []).map((state) => ({
+      ...state,
+      setVariables: state.mappings ?? [],
+      mappings: undefined,
+    })),
+  }));
+  serialized.profiles.forEach((profile) => {
+    profile.states.forEach((state) => {
+      delete state.mappings;
+    });
+  });
+  return serialized;
+}
+
+function serializePlayState(playState) {
+  const serialized = clone(playState);
+  serialized.integers = serialized.trackers ?? {};
+  serialized.enums = serialized.flags ?? {};
+  delete serialized.trackers;
+  delete serialized.flags;
+  return serialized;
+}
+
+function getGameCacheKey(game) {
+  const snapshot = serializeGame(game);
+  snapshot.nodes = snapshot.nodes.map((node) => ({
+    id: node.id,
+    name: node.name,
+    chapterId: node.chapterId,
+    secondary: node.secondary,
+    paragraphs: node.paragraphs,
+    isEndpoint: node.isEndpoint,
+    options: node.options,
+  }));
+  return hashString(JSON.stringify(snapshot));
+}
+
+function buildNodeSecondaryLine(game, node) {
+  const parts = [];
+  if (node.time) {
+    parts.push(formatClockTime(game?.world?.clockFormat || "24", node.time));
+  }
+  if (node.location) {
+    parts.push(node.location);
+  }
+  if (node.secondary) {
+    parts.push(node.secondary);
+  }
+  return parts.join(" • ");
+}
+
+function formatClockTime(clockFormat, time) {
+  if (!time) {
+    return "";
+  }
+  if (clockFormat === "12") {
+    const [hourString = "0", minuteString = "00"] = time.split(":");
+    const hour = Number(hourString);
+    const minute = String(minuteString).padStart(2, "0");
+    const suffix = hour >= 12 ? "PM" : "AM";
+    const normalizedHour = hour % 12 || 12;
+    return `${normalizedHour}:${minute} ${suffix}`;
+  }
+  return time;
+}
+
+function addMinutesToTimeString(time, delta) {
+  const [hourString = "0", minuteString = "0"] = time.split(":");
+  const totalMinutes = Number(hourString) * 60 + Number(minuteString) + delta;
+  const normalized = ((totalMinutes % 1440) + 1440) % 1440;
+  const hours = String(Math.floor(normalized / 60)).padStart(2, "0");
+  const minutes = String(normalized % 60).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
 function getNodeById(game, nodeId) {
-  return game?.nodes.find((node) => node.id === nodeId) || null;
+  return game?.nodes?.find((node) => node.id === nodeId) || null;
+}
+
+function getClusterById(game, clusterId) {
+  return game?.clusters?.find((cluster) => cluster.id === clusterId) || null;
 }
 
 function getOptionById(node, optionId) {
@@ -3059,6 +5477,18 @@ function getTrackerGroupById(game, groupId) {
 
 function getFlagById(game, flagId) {
   return game?.flags.find((flag) => flag.id === flagId) || null;
+}
+
+function getProfileById(game, profileId) {
+  return game?.profiles.find((profile) => profile.id === profileId) || null;
+}
+
+function getProfileStateById(profile, stateId) {
+  return profile?.states.find((state) => state.id === stateId) || null;
+}
+
+function getProfileStateByName(profile, stateName) {
+  return profile?.states.find((state) => state.name === stateName) || null;
 }
 
 function normalizeTrackerStart(tracker) {
@@ -3219,6 +5649,15 @@ function slugify(value) {
 
 function createId(prefix) {
   return `${prefix}_${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-4)}`;
+}
+
+function hashString(value) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `g${(hash >>> 0).toString(36)}`;
 }
 
 function escapeHtml(value) {
