@@ -1,6 +1,6 @@
 # Trackline
 
-A browser-based tool for authoring and playing branching text games built with plain HTML, CSS, and JavaScript.
+A browser-based tool for authoring and playing branching text games packaged as a single `index.html`.
 
 ## Features
 
@@ -14,6 +14,7 @@ A browser-based tool for authoring and playing branching text games built with p
 - Draft persistence in browser `localStorage`
 - Downloadable game files and save files
 - No build step required
+- Entire app bundled into one HTML file for easy local use and distribution
 
 ## Run locally
 
