@@ -1,14 +1,15 @@
-# Ponderosa - Chapter One
+# Trackline
 
-A browser-based narrative RPG prototype built with plain HTML, CSS, and JavaScript.
+A browser-based tool for authoring and playing branching text games built with plain HTML, CSS, and JavaScript.
 
 ## Features
 
-- Center-column transcript UI that logs system prompts and Eve's chosen replies
-- Chapter one story flow covering the townhouse morning, the university, and the cathedral meeting
-- Diegetic attribute assignment and persistent faction allegiance tracking
-- Autosave to browser `localStorage`
-- Exportable plaintext save files and matching import support
+- Shared single-file game format for both play mode and create mode
+- Ordered chapters, message nodes, rule-bearing options, trackers, tracker groups, and flags
+- Three-pane play interface with transcript, notes, tracker display, save export/import, and validation-aware startup
+- Graph-based editor with draggable message nodes, connection lines, inspector editing, and global data tabs
+- Draft persistence in browser `localStorage`
+- Downloadable game files and save files
 - No build step required
 
 ## Run locally

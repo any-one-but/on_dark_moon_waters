@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ponderosa - Chapter One</title>
+    <title>Trackline</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -13,94 +13,160 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="app-shell">
-      <aside class="side-panel">
-        <section class="brand-card panel-card">
-          <p class="panel-label">Chapter One</p>
-          <h1>Ponderosa</h1>
-          <p class="brand-copy">
-            Evangeline Fontaine wakes to a day claimed at once by the University,
-            the House of Apostles, and the Governor of Ponderosa.
-          </p>
-        </section>
+    <input id="playGameInput" type="file" accept=".json,.txt" hidden />
+    <input id="createGameInput" type="file" accept=".json,.txt" hidden />
+    <input id="playSaveInput" type="file" accept=".json,.txt" hidden />
 
-        <section class="panel-card">
-          <p class="panel-label">Progress</p>
-          <h2 id="chapterLabel" class="panel-heading">Loading...</h2>
-          <p id="sectionLabel" class="panel-copy"></p>
-          <p id="saveState" class="save-state">Checking autosave...</p>
-        </section>
+    <main class="app-root">
+      <section id="homeView" class="view"></section>
 
-        <section class="panel-card">
-          <p class="panel-label">Attributes</p>
-          <dl id="attributesList" class="stat-list"></dl>
-        </section>
-
-        <section class="panel-card">
-          <p class="panel-label">Allegiances</p>
-          <dl id="allegiancesList" class="stat-list"></dl>
-        </section>
-      </aside>
-
-      <section class="transcript-shell">
-        <header class="transcript-header">
-          <div>
-            <p class="panel-label">Interactive Transcript</p>
-            <h2>System prompts and Eve's replies collect here.</h2>
+      <section id="playView" class="view hidden">
+        <aside class="pane play-pane-left">
+          <div class="pane-card">
+            <p class="eyebrow">Play Mode</p>
+            <h1 id="playGameName">No game loaded</h1>
+            <p id="playChapterName" class="subhead"></p>
+            <p id="playMetaSummary" class="copy"></p>
           </div>
-          <p class="panel-copy transcript-copy">
-            Choices appear below and the log scrolls upward as the chapter unfolds.
-          </p>
-        </header>
 
-        <div id="transcript" class="transcript" aria-live="polite"></div>
+          <div class="pane-card">
+            <p class="eyebrow">Session</p>
+            <div id="playSessionInfo" class="stack compact"></div>
+          </div>
 
-        <section class="choices-shell">
-          <p class="panel-label">Current Choices</p>
-          <div id="choicesContainer" class="choices-container"></div>
+          <div class="pane-card">
+            <p class="eyebrow">Controls</p>
+            <div class="button-stack">
+              <button id="playLoadGameButton" class="button secondary" type="button">
+                Load Game File
+              </button>
+              <button id="playImportSaveButton" class="button secondary" type="button">
+                Import Save
+              </button>
+              <button id="playExportSaveButton" class="button" type="button">
+                Export Save
+              </button>
+              <button id="playRestartButton" class="button secondary" type="button">
+                Restart Run
+              </button>
+              <button id="playBackHomeButton" class="button ghost" type="button">
+                Return to Menu
+              </button>
+            </div>
+          </div>
+
+          <div class="pane-card">
+            <p class="eyebrow">Validation</p>
+            <div id="playValidationSummary" class="stack compact"></div>
+          </div>
+        </aside>
+
+        <section class="pane play-pane-center">
+          <header class="center-header">
+            <div>
+              <p class="eyebrow">Transcript</p>
+              <h2>Current play log</h2>
+            </div>
+            <p class="copy">Messages, choices, and chapter transitions accumulate here.</p>
+          </header>
+
+          <div id="playLog" class="play-log"></div>
+
+          <section class="choice-panel">
+            <p class="eyebrow">Available Options</p>
+            <div id="playCurrentMessage" class="current-message"></div>
+            <div id="playOptions" class="option-list"></div>
+          </section>
         </section>
+
+        <aside class="pane play-pane-right">
+          <div class="pane-card">
+            <p class="eyebrow">Notes</p>
+            <textarea
+              id="playNotes"
+              class="notes-field"
+              placeholder="Player notes are saved with the run."
+            ></textarea>
+          </div>
+
+          <div class="pane-card">
+            <p class="eyebrow">Trackers</p>
+            <div id="playTrackerGroups" class="stack"></div>
+          </div>
+
+          <div class="pane-card">
+            <p class="eyebrow">Flags</p>
+            <div id="playFlags" class="stack compact"></div>
+          </div>
+        </aside>
       </section>
 
-      <aside class="side-panel">
-        <section class="panel-card">
-          <p class="panel-label">Companions</p>
-          <ul class="companion-list">
-            <li>
-              <strong>Lady Angelica Dentelle</strong>
-              <span>Matron healer, majordomo, and the one person alive allowed to scold Eve on sight.</span>
-            </li>
-            <li>
-              <strong>Sir Henry Acrillico</strong>
-              <span>Knight of House d'Fontaine, loyal bodyguard, and far too earnest to hide it.</span>
-            </li>
-            <li>
-              <strong>Cobalt and Azzurra</strong>
-              <span>A raven who misses nothing and a planar kitten who misses gravity whenever possible.</span>
-            </li>
-          </ul>
-        </section>
+      <section id="createView" class="view hidden">
+        <aside class="create-sidebar">
+          <div class="pane-card">
+            <p class="eyebrow">Create Mode</p>
+            <h2 id="editorGameName">Untitled Game</h2>
+            <p id="editorStatus" class="copy"></p>
+            <div class="button-stack slim">
+              <button id="editorNewButton" class="button secondary" type="button">
+                New Game
+              </button>
+              <button id="editorLoadButton" class="button secondary" type="button">
+                Load Game File
+              </button>
+              <button id="editorDownloadButton" class="button" type="button">
+                Download Game
+              </button>
+              <button id="editorTestPlayButton" class="button secondary" type="button">
+                Test Play
+              </button>
+              <button id="editorBackHomeButton" class="button ghost" type="button">
+                Return to Menu
+              </button>
+            </div>
+          </div>
 
-        <section class="panel-card">
-          <p class="panel-label">Current Tension</p>
-          <p id="tensionText" class="panel-copy"></p>
-        </section>
+          <div class="pane-card">
+            <p class="eyebrow">Global Data</p>
+            <div id="editorTabButtons" class="tab-list"></div>
+            <div id="editorSidebarContent" class="sidebar-scroll"></div>
+          </div>
+        </aside>
 
-        <section class="panel-card">
-          <p class="panel-label">Controls</p>
-          <div class="controls-panel">
-            <button id="newGameButton" class="control-button secondary" type="button">
-              Restart Chapter
-            </button>
-            <button id="saveButton" class="control-button" type="button">
-              Export Save
-            </button>
-            <button id="loadButton" class="control-button secondary" type="button">
-              Import Save
-            </button>
-            <input id="loadInput" type="file" accept=".txt,.json" hidden />
+        <section class="create-center">
+          <header class="graph-toolbar">
+            <div class="toolbar-group">
+              <button id="graphAddNodeButton" class="button" type="button">Add Message</button>
+              <button id="graphCenterButton" class="button secondary" type="button">
+                Center Graph
+              </button>
+            </div>
+            <div class="toolbar-group">
+              <button id="graphZoomOutButton" class="button secondary" type="button">
+                -
+              </button>
+              <span id="graphZoomLabel" class="zoom-label">100%</span>
+              <button id="graphZoomInButton" class="button secondary" type="button">
+                +
+              </button>
+            </div>
+          </header>
+
+          <div id="graphViewport" class="graph-viewport">
+            <div id="graphWorld" class="graph-world">
+              <svg id="graphConnections" class="graph-connections"></svg>
+              <div id="graphNodes" class="graph-nodes"></div>
+            </div>
           </div>
         </section>
-      </aside>
+
+        <aside class="inspector-sidebar">
+          <div class="pane-card inspector-card">
+            <p class="eyebrow">Inspector</p>
+            <div id="editorInspector" class="sidebar-scroll"></div>
+          </div>
+        </aside>
+      </section>
     </main>
 
     <script src="./app.js"></script>
