@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>On Dark Moon Waters</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="title-panel">
+        <p class="eyebrow">Browser RPG</p>
+        <h1>On Dark Moon Waters</h1>
+        <p class="lead">
+          Guide a lone ferryman through drowned ruins, old vows, and the thing
+          singing beneath the tide.
+        </p>
+      </section>
+
+      <section class="game-panel">
+        <div class="status-bar">
+          <div class="status-card">
+            <span class="status-label">Health</span>
+            <strong id="healthStat">0</strong>
+          </div>
+          <div class="status-card">
+            <span class="status-label">Resolve</span>
+            <strong id="resolveStat">0</strong>
+          </div>
+          <div class="status-card">
+            <span class="status-label">Silver</span>
+            <strong id="silverStat">0</strong>
+          </div>
+          <div class="status-card">
+            <span class="status-label">Moonwater</span>
+            <strong id="moonwaterStat">0</strong>
+          </div>
+        </div>
+
+        <article class="story-card">
+          <div class="story-header">
+            <div>
+              <p class="section-label">Current Scene</p>
+              <h2 id="sceneTitle">Loading...</h2>
+            </div>
+            <p id="saveState" class="save-state">Checking autosave...</p>
+          </div>
+          <p id="sceneText" class="scene-text"></p>
+          <ul id="inventoryList" class="inventory-list" aria-label="Inventory"></ul>
+        </article>
+
+        <section class="choices-panel">
+          <p class="section-label">Choices</p>
+          <div id="choicesContainer" class="choices-container"></div>
+        </section>
+
+        <section class="controls-panel">
+          <button id="newGameButton" class="control-button secondary">
+            Start Over
+          </button>
+          <button id="saveButton" class="control-button">Download Save</button>
+          <button id="loadButton" class="control-button secondary">
+            Import Save
+          </button>
+          <input id="loadInput" type="file" accept=".txt,.json" hidden />
+        </section>
+
+        <section class="log-panel">
+          <div class="log-header">
+            <p class="section-label">Latest Echoes</p>
+            <span id="endingBadge" class="ending-badge" hidden>Ending Reached</span>
+          </div>
+          <ul id="logList" class="log-list"></ul>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
