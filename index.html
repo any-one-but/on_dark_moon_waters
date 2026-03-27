@@ -32,6 +32,12 @@
   --warning: #f2c26d;
   --danger: #df8f87;
   --shadow: 0 24px 64px rgba(2, 8, 12, 0.34);
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
+  --radius-pill: 999px;
+  --create-gutter: 14px;
 }
 
 * {
@@ -131,6 +137,7 @@ h3 {
 .mode-card,
 .graph-toolbar {
   border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   backdrop-filter: blur(18px);
 }
@@ -167,6 +174,7 @@ h3 {
 .button {
   appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
   background: linear-gradient(180deg, rgba(232, 132, 80, 0.18), rgba(232, 132, 80, 0.08));
   color: var(--text);
   padding: 12px 14px;
@@ -205,6 +213,7 @@ h3 {
   gap: 6px;
   padding: 6px 9px;
   border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.05);
   color: var(--muted);
   font-size: 0.86rem;
@@ -247,6 +256,7 @@ h3 {
 .mode-action {
   padding: 18px;
   border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.04);
 }
 
@@ -299,6 +309,7 @@ h3 {
     linear-gradient(180deg, rgba(251, 247, 239, 0.98), rgba(244, 236, 221, 0.96)),
     var(--paper);
   border: 1px solid var(--line-paper);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   overflow: hidden;
 }
@@ -365,6 +376,7 @@ h3 {
 
 .choice-panel {
   padding: 14px 18px 18px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 252, 246, 0.94);
   display: grid;
   gap: 10px;
@@ -385,6 +397,7 @@ h3 {
 .play-option {
   padding: 12px 16px;
   border: 1px solid rgba(39, 53, 66, 0.12);
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.8);
   color: var(--ink);
   text-align: left;
@@ -420,6 +433,7 @@ h3 {
 .textarea {
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
   padding: 10px 12px;
@@ -442,7 +456,7 @@ h3 {
   padding: 0;
   border: 0;
   background: transparent;
-  border-radius: 0;
+  border-radius: var(--radius-md);
 }
 
 .tracker-row,
@@ -542,6 +556,8 @@ h3 {
   appearance: none;
   border: 0;
   border-bottom: 2px solid transparent;
+  border-top-left-radius: var(--radius-sm);
+  border-top-right-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   padding: 12px 14px 10px;
@@ -606,7 +622,13 @@ h3 {
 .graph-nodes {
   position: absolute;
   inset: 0;
-  z-index: 2;
+}
+
+.graph-overlays {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
 }
 
 .graph-node {
@@ -734,7 +756,7 @@ h3 {
   width: 32px;
   height: 32px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.04);
   color: var(--muted);
   cursor: pointer;
@@ -782,12 +804,14 @@ h3 {
 }
 
 .node-paragraph {
+  position: relative;
   display: grid;
   gap: 8px;
   padding: 12px 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.04);
+  cursor: grab;
 }
 
 .node-paragraph.selected {
@@ -797,13 +821,6 @@ h3 {
 
 .node-paragraph-readonly .node-block-head {
   justify-content: flex-start;
-}
-
-.node-paragraph-options {
-  display: grid;
-  gap: 8px;
-  padding-top: 4px;
-  justify-items: center;
 }
 
 .node-paragraph-copy {
@@ -856,12 +873,25 @@ h3 {
 .node-paragraph-text,
 .node-option-text {
   width: 100%;
-  min-height: 78px;
+  margin: 0;
+  color: var(--text);
+  line-height: 1.55;
+}
+
+.node-text-static {
+  display: block;
+  width: 100%;
+  min-height: 0;
   border: 0;
+  border-radius: 0;
   background: transparent;
   color: var(--text);
   padding: 0;
-  resize: vertical;
+  overflow: visible;
+  font: inherit;
+  pointer-events: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   line-height: 1.55;
 }
 
@@ -878,10 +908,11 @@ h3 {
   margin: 0 auto;
   padding: 10px 48px 12px 18px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px 22px 22px 10px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.04);
   display: grid;
   gap: 8px;
+  cursor: grab;
 }
 
 .node-option.selected {
@@ -919,6 +950,41 @@ h3 {
 .option-handle {
   cursor: crosshair;
   box-shadow: 0 0 0 4px rgba(8, 17, 24, 0.96);
+}
+
+.floating-node-panel {
+  position: absolute;
+  z-index: 12;
+  pointer-events: auto;
+  transform: translateY(-50%);
+}
+
+.floating-node-panel-right {
+  left: calc(100% + 8px);
+}
+
+.floating-node-panel-left {
+  right: calc(100% + 8px);
+}
+
+.floating-node-panel-shell {
+  width: min(340px, 34vw);
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(8, 18, 26, 0.96);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+.floating-node-panel-shell .form-block {
+  gap: 10px;
+}
+
+.floating-node-panel-shell .paper-note {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .connection-path.cluster-link {
@@ -963,6 +1029,7 @@ h3 {
   width: 320px;
   padding: 18px;
   border: 1px dashed rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.04);
 }
 
@@ -985,28 +1052,28 @@ h3 {
 
 .create-panel {
   position: absolute;
-  top: 0;
-  z-index: 2;
+  top: var(--create-gutter);
+  z-index: 8;
   display: grid;
   overflow: hidden;
   border: 1px solid rgba(198, 218, 228, 0.12);
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   background: rgba(8, 18, 26, 0.88);
   box-shadow: var(--shadow);
   backdrop-filter: blur(18px);
 }
 
 .create-panel-left {
-  left: 0;
-  width: min(430px, calc(100vw - 20px));
-  max-height: calc(100vh - 26px);
+  left: var(--create-gutter);
+  width: min(430px, calc(100vw - (var(--create-gutter) * 2)));
+  max-height: calc(100vh - (var(--create-gutter) * 2));
   grid-template-rows: auto minmax(0, 1fr);
 }
 
 .create-panel-right {
-  right: 0;
-  width: min(360px, calc(100vw - 28px));
-  max-height: calc(100vh - 26px);
+  right: var(--create-gutter);
+  width: min(360px, calc(100vw - (var(--create-gutter) * 2)));
+  max-height: calc(100vh - (var(--create-gutter) * 2));
   grid-template-rows: minmax(0, 1fr);
 }
 
@@ -1033,9 +1100,9 @@ h3 {
 
 .graph-floating-controls {
   position: absolute;
-  top: 14px;
-  left: 446px;
-  z-index: 2;
+  top: var(--create-gutter);
+  left: calc(var(--create-gutter) + 430px + 16px);
+  z-index: 8;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -1049,7 +1116,7 @@ h3 {
   gap: 8px;
   padding: 8px 10px;
   border: 1px solid var(--line);
-  border-radius: 24px;
+  border-radius: var(--radius-xl);
   background: rgba(8, 18, 26, 0.9);
   box-shadow: var(--shadow);
   backdrop-filter: blur(18px);
@@ -1059,7 +1126,7 @@ h3 {
   width: 42px;
   height: 42px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(8, 18, 26, 0.9);
   color: var(--text);
   box-shadow: var(--shadow);
@@ -1094,12 +1161,12 @@ h3 {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  z-index: 4;
+  z-index: 10;
   display: grid;
   min-width: 132px;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: rgba(8, 18, 26, 0.96);
   box-shadow: var(--shadow);
 }
@@ -1123,6 +1190,84 @@ h3 {
   outline: none;
 }
 
+.popover-item.is-selected {
+  background: rgba(221, 131, 84, 0.16);
+  color: var(--accent-soft);
+}
+
+.floating-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.floating-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-icon-button {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+}
+
+.node-paragraph.is-dragging,
+.node-option.is-dragging {
+  cursor: grabbing;
+}
+
+.select-menu {
+  width: 100%;
+}
+
+.select-menu-input {
+  display: none;
+}
+
+.select-menu-button {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.select-menu-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.select-menu-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select-menu-caret {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.select-menu .popover-menu {
+  left: 0;
+  right: auto;
+  min-width: 100%;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
 .tracker-card-head {
   align-items: start;
 }
@@ -1137,7 +1282,7 @@ h3 {
   width: 42px;
   height: 42px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: linear-gradient(180deg, rgba(232, 132, 80, 0.28), rgba(232, 132, 80, 0.14));
   color: var(--text);
   box-shadow: var(--shadow);
@@ -1172,6 +1317,7 @@ h3 {
 .item-card {
   padding: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.04);
   display: grid;
   gap: 10px;
@@ -1196,6 +1342,7 @@ h3 {
 .paper-note {
   padding: 12px 14px;
   border: 1px solid var(--line-paper);
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.62);
   color: var(--ink-soft);
 }
@@ -1206,15 +1353,19 @@ h3 {
   }
 
   .create-panel-left {
-    width: min(390px, calc(100vw - 18px));
+    width: min(390px, calc(100vw - (var(--create-gutter) * 2)));
   }
 
   .graph-floating-controls {
-    left: 402px;
+    left: calc(var(--create-gutter) + 390px + 12px);
   }
 }
 
 @media (max-width: 980px) {
+  :root {
+    --create-gutter: 8px;
+  }
+
   .app-root {
     padding: 0;
   }
@@ -1231,9 +1382,9 @@ h3 {
 
   .create-panel-left,
   .create-panel-right {
-    width: calc(100vw - 16px);
-    left: 8px;
-    right: 8px;
+    width: calc(100vw - (var(--create-gutter) * 2));
+    left: var(--create-gutter);
+    right: var(--create-gutter);
   }
 
   .create-panel-right {
@@ -1243,9 +1394,9 @@ h3 {
   }
 
   .graph-floating-controls {
-    left: 8px;
+    left: var(--create-gutter);
     top: auto;
-    bottom: 8px;
+    bottom: var(--create-gutter);
     flex-direction: row;
     align-items: center;
     flex-wrap: wrap;
@@ -1353,6 +1504,7 @@ h3 {
           <div id="graphWorld" class="graph-world">
             <svg id="graphConnections" class="graph-connections"></svg>
             <div id="graphNodes" class="graph-nodes"></div>
+            <div id="graphOverlays" class="graph-overlays"></div>
           </div>
 
           <aside class="create-panel create-panel-left">
@@ -1403,7 +1555,6 @@ const NODE_OPTION_HEIGHT = 38;
 
 const CREATE_TABS = [
   { id: "system", label: "System" },
-  { id: "world", label: "World Settings" },
   { id: "chapters", label: "Chapters" },
   { id: "trackers", label: "Integers" },
   { id: "groups", label: "Groups" },
@@ -1490,6 +1641,7 @@ const refs = {
   graphWorld: document.getElementById("graphWorld"),
   graphConnections: document.getElementById("graphConnections"),
   graphNodes: document.getElementById("graphNodes"),
+  graphOverlays: document.getElementById("graphOverlays"),
   editorInspectorShell: document.getElementById("editorInspectorShell"),
   editorInspector: document.getElementById("editorInspector"),
   graphAddClusterButton: document.getElementById("graphAddClusterButton"),
@@ -1514,6 +1666,9 @@ const appState = {
     trackerMenuId: null,
     nodeMenuId: null,
     paragraphMenuId: null,
+    optionMenuId: null,
+    floatingActionMenuId: null,
+    selectMenuId: null,
   },
   graph: {
     panX: 140,
@@ -1571,6 +1726,8 @@ function bindGlobalEvents() {
   refs.editorSidebarContent.addEventListener("change", handleSidebarChange);
   refs.editorInspector.addEventListener("click", handleInspectorClick);
   refs.editorInspector.addEventListener("change", handleInspectorChange);
+  refs.graphOverlays.addEventListener("click", handleInspectorClick);
+  refs.graphOverlays.addEventListener("change", handleInspectorChange);
   refs.graphAddNodeButton.addEventListener("click", addNodeAtViewportCenter);
   refs.graphAddClusterButton.addEventListener("click", addClusterAtViewportCenter);
   refs.graphCenterButton.addEventListener("click", centerGraph);
@@ -1922,6 +2079,7 @@ function renderCreateView() {
     refs.editorInspectorShell.classList.add("hidden");
     refs.graphNodes.innerHTML = `<div class="empty-graph">Create a new game to begin authoring.</div>`;
     refs.graphConnections.innerHTML = "";
+    refs.graphOverlays.innerHTML = "";
     refs.graphZoomLabel.textContent = `${Math.round(appState.graph.zoom * 100)}%`;
     applyGraphTransform();
     return;
@@ -1949,9 +2107,6 @@ function renderEditorSidebar(game) {
   switch (appState.createTab) {
     case "system":
       refs.editorSidebarContent.innerHTML = renderSystemTab(game);
-      break;
-    case "world":
-      refs.editorSidebarContent.innerHTML = renderWorldTab(game);
       break;
     case "chapters":
       refs.editorSidebarContent.innerHTML = renderChaptersTab(game);
@@ -2007,38 +2162,67 @@ function renderSystemTab(game) {
   `;
 }
 
-function renderWorldTab(game) {
+function renderSelectControl({
+  menuId,
+  value = "",
+  options = [],
+  attributes = {},
+  placeholder = "Select an option",
+  emptyLabel = "No options available",
+}) {
+  const normalizedValue = value ?? "";
+  const optionList = options.map((option) => ({
+    value: option?.value ?? "",
+    label: option?.label ?? String(option?.value ?? ""),
+  }));
+  const selectedOption =
+    optionList.find((option) => String(option.value) === String(normalizedValue)) ||
+    (normalizedValue !== "" && normalizedValue !== null && normalizedValue !== undefined
+      ? { value: normalizedValue, label: String(normalizedValue) }
+      : null);
+  const isOpen = appState.selection.selectMenuId === menuId;
+  const disabled = optionList.length === 0;
+  const label = selectedOption?.label || (disabled ? emptyLabel : placeholder);
+
   return `
-    <div class="form-block">
-      <div class="field-group">
-        <label>Clock</label>
-        <select class="field" data-world-field="clockFormat">
-          <option value="12" ${game.world.clockFormat === "12" ? "selected" : ""}>12 hour</option>
-          <option value="24" ${game.world.clockFormat === "24" ? "selected" : ""}>24 hour</option>
-        </select>
-      </div>
-      <div class="field-group">
-        <label>Locations</label>
-        <div class="list-block">
-          ${
-            game.world.locations.length
-              ? game.world.locations
+    <div class="menu-wrap select-menu" data-select-menu-id="${escapeAttr(menuId)}">
+      <input
+        type="hidden"
+        class="select-menu-input"
+        value="${escapeAttr(String(normalizedValue))}"
+        ${buildDataAttributes(attributes)}
+      />
+      <button
+        class="field select-menu-button"
+        type="button"
+        data-action="toggle-select-menu"
+        data-select-menu-id="${escapeAttr(menuId)}"
+        ${disabled ? "disabled" : ""}
+      >
+        <span class="select-menu-label">${escapeHtml(label)}</span>
+        <span class="select-menu-caret" aria-hidden="true">▾</span>
+      </button>
+      ${
+        isOpen && !disabled
+          ? `
+              <div class="popover-menu">
+                ${optionList
                   .map(
-                    (location, index) => `
-                      <div class="inline-row">
-                        <input class="field" data-location-index="${index}" value="${escapeAttr(location)}" />
-                        <button class="button small ghost" type="button" data-action="delete-location" data-location-index="${index}">Delete</button>
-                      </div>
+                    (option) => `
+                      <button
+                        class="popover-item ${String(option.value) === String(normalizedValue) ? "is-selected" : ""}"
+                        type="button"
+                        data-action="select-menu-option"
+                        data-select-menu-id="${escapeAttr(menuId)}"
+                        data-select-menu-value="${escapeAttr(String(option.value))}"
+                      >${escapeHtml(option.label)}</button>
                     `
                   )
-                  .join("")
-              : '<div class="paper-note">No locations in the glossary yet.</div>'
-          }
-        </div>
-      </div>
-      <div class="tracker-add-wrap">
-        <button class="list-add-fab" type="button" data-action="add-location" title="Add location">+</button>
-      </div>
+                  .join("")}
+              </div>
+            `
+          : ""
+      }
     </div>
   `;
 }
@@ -2065,10 +2249,18 @@ function renderChaptersTab(game) {
             </div>
             <div class="field-group">
               <label>Starts on</label>
-              <select class="field" data-chapter-field="startNodeId" data-chapter-id="${escapeAttr(chapter.id)}">
-                <option value="">Unassigned</option>
-                ${renderNodeOptions(game, chapter.startNodeId, chapter.id)}
-              </select>
+              ${renderSelectControl({
+                menuId: `chapter:${chapter.id}:startNodeId`,
+                value: chapter.startNodeId || "",
+                attributes: {
+                  "data-chapter-field": "startNodeId",
+                  "data-chapter-id": chapter.id,
+                },
+                options: [
+                  { value: "", label: "Unassigned" },
+                  ...getNodeOptions(game, chapter.id),
+                ],
+              })}
             </div>
             <div class="inline-row">
               <span class="muted">${nodeCount} assigned message${nodeCount === 1 ? "" : "s"}</span>
@@ -2131,17 +2323,21 @@ function renderTrackersTab(game) {
                       </div>
                       <div class="field-group">
                         <label>Group</label>
-                        <select class="field" data-tracker-field="groupId" data-tracker-id="${escapeAttr(tracker.id)}">
-                          <option value="">Ungrouped</option>
-                          ${game.trackerGroups
-                            .map(
-                              (group) =>
-                                `<option value="${escapeAttr(group.id)}" ${
-                                  tracker.groupId === group.id ? "selected" : ""
-                                }>${escapeHtml(group.name || group.id)}</option>`
-                            )
-                            .join("")}
-                        </select>
+                        ${renderSelectControl({
+                          menuId: `tracker:${tracker.id}:groupId`,
+                          value: tracker.groupId || "",
+                          attributes: {
+                            "data-tracker-field": "groupId",
+                            "data-tracker-id": tracker.id,
+                          },
+                          options: [
+                            { value: "", label: "Ungrouped" },
+                            ...game.trackerGroups.map((group) => ({
+                              value: group.id,
+                              label: group.name || group.id,
+                            })),
+                          ],
+                        })}
                       </div>
                     </div>
                     <label class="node-toggle">
@@ -2166,25 +2362,27 @@ function renderTrackersTab(game) {
                     </div>
                     <div class="field-group">
                       <label>Directional Restriction</label>
-                      <select class="field" data-tracker-field="direction" data-tracker-id="${escapeAttr(tracker.id)}">
-                        ${DIRECTION_OPTIONS.map(
-                          (option) =>
-                            `<option value="${option.value}" ${
-                              tracker.direction === option.value ? "selected" : ""
-                            }>${escapeHtml(option.label)}</option>`
-                        ).join("")}
-                      </select>
+                      ${renderSelectControl({
+                        menuId: `tracker:${tracker.id}:direction`,
+                        value: tracker.direction,
+                        attributes: {
+                          "data-tracker-field": "direction",
+                          "data-tracker-id": tracker.id,
+                        },
+                        options: DIRECTION_OPTIONS,
+                      })}
                     </div>
                     <div class="field-group">
                       <label>Sign Restriction</label>
-                      <select class="field" data-tracker-field="sign" data-tracker-id="${escapeAttr(tracker.id)}">
-                        ${SIGN_OPTIONS.map(
-                          (option) =>
-                            `<option value="${option.value}" ${
-                              tracker.sign === option.value ? "selected" : ""
-                            }>${escapeHtml(option.label)}</option>`
-                        ).join("")}
-                      </select>
+                      ${renderSelectControl({
+                        menuId: `tracker:${tracker.id}:sign`,
+                        value: tracker.sign,
+                        attributes: {
+                          "data-tracker-field": "sign",
+                          "data-tracker-id": tracker.id,
+                        },
+                        options: SIGN_OPTIONS,
+                      })}
                     </div>
                   </div>
                 `;
@@ -2310,9 +2508,15 @@ function renderProfilesTab(game) {
                     </label>
                     <div class="field-group">
                       <label>Starting State</label>
-                      <select class="field" data-profile-field="startState" data-profile-id="${escapeAttr(profile.id)}">
-                        ${renderStateOptions(profile.states, profile.startState)}
-                      </select>
+                      ${renderSelectControl({
+                        menuId: `profile:${profile.id}:startState`,
+                        value: profile.startState ?? "__NULL__",
+                        attributes: {
+                          "data-profile-field": "startState",
+                          "data-profile-id": profile.id,
+                        },
+                        options: getStateOptions(profile.states),
+                      })}
                     </div>
                     <div class="field-group">
                       <label>States</label>
@@ -2429,9 +2633,6 @@ function renderStringsTab(game) {
 
 function renderInspector(game) {
   const cluster = appState.selection.clusterId ? getClusterById(game, appState.selection.clusterId) : null;
-  const node = appState.selection.nodeId ? getNodeById(game, appState.selection.nodeId) : null;
-  const paragraph = node && appState.selection.paragraphId ? getParagraphById(node, appState.selection.paragraphId) : null;
-  const option = node && appState.selection.optionId ? getOptionById(node, appState.selection.optionId) : null;
 
   if (cluster) {
     refs.editorInspectorShell.classList.remove("hidden");
@@ -2439,16 +2640,8 @@ function renderInspector(game) {
     return;
   }
 
-  if (!node || (!paragraph && !option)) {
-    refs.editorInspector.innerHTML = "";
-    refs.editorInspectorShell.classList.add("hidden");
-    return;
-  }
-
-  refs.editorInspectorShell.classList.remove("hidden");
-  refs.editorInspector.innerHTML = paragraph
-    ? renderParagraphInspector(game, node, paragraph)
-    : renderOptionInspector(game, node, option);
+  refs.editorInspector.innerHTML = "";
+  refs.editorInspectorShell.classList.add("hidden");
 }
 
 function renderClusterInspector(game, cluster) {
@@ -2464,10 +2657,12 @@ function renderClusterInspector(game, cluster) {
       </div>
       <div class="field-group">
         <label>Target message</label>
-        <select class="field" data-cluster-field="targetNodeId">
-          <option value="">Unassigned</option>
-          ${renderNodeOptions(game, cluster.targetNodeId)}
-        </select>
+        ${renderSelectControl({
+          menuId: `cluster:${cluster.id}:targetNodeId`,
+          value: cluster.targetNodeId || "",
+          attributes: { "data-cluster-field": "targetNodeId" },
+          options: [{ value: "", label: "Unassigned" }, ...getNodeOptions(game)],
+        })}
       </div>
       <div class="item-actions">
         <button class="button small ghost" type="button" data-action="delete-cluster">Delete Cluster</button>
@@ -2478,14 +2673,42 @@ function renderClusterInspector(game, cluster) {
 
 function renderParagraphInspector(game, node, paragraph) {
   const paragraphIndex = node.paragraphs.findIndex((entry) => entry.id === paragraph.id);
+  const actionMenuId = buildFloatingActionMenuKey("paragraph", node.id, paragraph.id);
+  const actionMenuOpen = appState.selection.floatingActionMenuId === actionMenuId;
   return `
     <div class="form-block">
-      <div class="inline-row">
+      <div class="floating-panel-head">
         <strong>Paragraph</strong>
-        <button class="button small ghost" type="button" data-action="clear-paragraph-selection">Close</button>
+        <div class="floating-panel-actions">
+          <div class="menu-wrap">
+            <button class="button small ghost menu-button panel-icon-button" type="button" data-action="toggle-floating-action-menu" data-floating-action-menu-id="${escapeAttr(
+              actionMenuId
+            )}">···</button>
+            ${
+              actionMenuOpen
+                ? `
+                    <div class="popover-menu">
+                      <button class="popover-item" type="button" data-action="duplicate-paragraph-inline" data-node-id="${escapeAttr(
+                        node.id
+                      )}" data-paragraph-id="${escapeAttr(paragraph.id)}">Duplicate</button>
+                      <button class="popover-item" type="button" data-action="delete-paragraph-inline" data-node-id="${escapeAttr(
+                        node.id
+                      )}" data-paragraph-id="${escapeAttr(paragraph.id)}" ${node.paragraphs.length === 1 ? "disabled" : ""}>Delete</button>
+                    </div>
+                  `
+                : ""
+            }
+          </div>
+          <button class="button small ghost panel-icon-button" type="button" data-action="clear-paragraph-selection" aria-label="Close paragraph panel">&times;</button>
+        </div>
       </div>
 
-      <div class="paper-note">${escapeHtml(paragraph.text || "Empty paragraph.")}</div>
+      <div class="field-group">
+        <label>Text</label>
+        <textarea class="textarea" data-node-id="${escapeAttr(node.id)}" data-paragraph-id="${escapeAttr(
+          paragraph.id
+        )}" data-paragraph-field="text">${escapeHtml(paragraph.text)}</textarea>
+      </div>
 
       <div class="item-card">
         <div class="inline-row">
@@ -2501,43 +2724,56 @@ function renderParagraphInspector(game, node, paragraph) {
         }
       </div>
 
-      <div class="item-actions">
-        <button class="button small ghost" type="button" data-action="move-paragraph-up" ${
-          paragraphIndex <= 0 ? "disabled" : ""
-        }>Move Up</button>
-        <button class="button small ghost" type="button" data-action="move-paragraph-down" ${
-          paragraphIndex >= node.paragraphs.length - 1 ? "disabled" : ""
-        }>Move Down</button>
-        <button class="button small secondary" type="button" data-action="duplicate-paragraph-inline" data-node-id="${escapeAttr(
-          node.id
-        )}" data-paragraph-id="${escapeAttr(paragraph.id)}">Duplicate Paragraph</button>
-        <button class="button small ghost" type="button" data-action="delete-paragraph-inline" data-node-id="${escapeAttr(
-          node.id
-        )}" data-paragraph-id="${escapeAttr(paragraph.id)}" ${node.paragraphs.length === 1 ? "disabled" : ""}>Delete Paragraph</button>
-      </div>
     </div>
   `;
 }
 
 function renderOptionInspector(game, node, option) {
-  const optionIndex = node.options.findIndex((entry) => entry.id === option.id);
+  const actionMenuId = buildFloatingActionMenuKey("option", node.id, option.id);
+  const actionMenuOpen = appState.selection.floatingActionMenuId === actionMenuId;
   return `
     <div class="form-block">
-      <div class="inline-row">
+      <div class="floating-panel-head">
         <strong>${escapeHtml(option.text || "Untitled option")}</strong>
-        <button class="button small ghost" type="button" data-action="clear-option-selection">Close</button>
+        <div class="floating-panel-actions">
+          <div class="menu-wrap">
+            <button class="button small ghost menu-button panel-icon-button" type="button" data-action="toggle-floating-action-menu" data-floating-action-menu-id="${escapeAttr(
+              actionMenuId
+            )}">···</button>
+            ${
+              actionMenuOpen
+                ? `
+                    <div class="popover-menu">
+                      <button class="popover-item" type="button" data-action="duplicate-option-inline" data-node-id="${escapeAttr(
+                        node.id
+                      )}" data-option-id="${escapeAttr(option.id)}">Duplicate</button>
+                      <button class="popover-item" type="button" data-action="delete-option-inline" data-node-id="${escapeAttr(
+                        node.id
+                      )}" data-option-id="${escapeAttr(option.id)}">Delete</button>
+                    </div>
+                  `
+                : ""
+            }
+          </div>
+          <button class="button small ghost panel-icon-button" type="button" data-action="clear-option-selection" aria-label="Close option panel">&times;</button>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label>Text</label>
+        <textarea class="textarea" data-node-id="${escapeAttr(node.id)}" data-option-id="${escapeAttr(
+          option.id
+        )}" data-option-field="text">${escapeHtml(option.text)}</textarea>
       </div>
 
       <div class="field-group">
         <label>Target behavior</label>
-        <select class="field" data-option-field="terminal">
-          ${TERMINAL_OPTIONS.map(
-            (terminal) =>
-              `<option value="${terminal.value}" ${
-                option.terminal === terminal.value ? "selected" : ""
-              }>${escapeHtml(terminal.label)}</option>`
-          ).join("")}
-        </select>
+        ${renderSelectControl({
+          menuId: `option:${option.id}:terminal`,
+          value: option.terminal,
+          attributes: { "data-option-field": "terminal" },
+          options: TERMINAL_OPTIONS,
+        })}
       </div>
 
       ${
@@ -2545,10 +2781,12 @@ function renderOptionInspector(game, node, option) {
           ? `
             <div class="field-group">
               <label>Target message</label>
-              <select class="field" data-option-field="targetNodeId">
-                <option value="">Unassigned</option>
-                ${renderNodeOptions(game, option.targetNodeId)}
-              </select>
+              ${renderSelectControl({
+                menuId: `option:${option.id}:targetNodeId`,
+                value: option.targetNodeId || "",
+                attributes: { "data-option-field": "targetNodeId" },
+                options: [{ value: "", label: "Unassigned" }, ...getNodeOptions(game)],
+              })}
             </div>
           `
           : ""
@@ -2556,26 +2794,22 @@ function renderOptionInspector(game, node, option) {
 
       <div class="field-group">
         <label>Failed Variable Check Behavior</label>
-        <select class="field" data-option-field="failureMode">
-          ${FAILURE_OPTIONS.map(
-            (failure) =>
-              `<option value="${failure.value}" ${
-                option.failureMode === failure.value ? "selected" : ""
-              }>${escapeHtml(failure.label)}</option>`
-          ).join("")}
-        </select>
+        ${renderSelectControl({
+          menuId: `option:${option.id}:failureMode`,
+          value: option.failureMode,
+          attributes: { "data-option-field": "failureMode" },
+          options: FAILURE_OPTIONS,
+        })}
       </div>
 
       <div class="field-group">
         <label>Variable Check Display</label>
-        <select class="field" data-option-field="requirementDisplayMode">
-          ${DISPLAY_OPTIONS.map(
-            (display) =>
-              `<option value="${display.value}" ${
-                option.requirementDisplayMode === display.value ? "selected" : ""
-              }>${escapeHtml(display.label)}</option>`
-          ).join("")}
-        </select>
+        ${renderSelectControl({
+          menuId: `option:${option.id}:requirementDisplayMode`,
+          value: option.requirementDisplayMode,
+          attributes: { "data-option-field": "requirementDisplayMode" },
+          options: DISPLAY_OPTIONS,
+        })}
       </div>
 
       ${
@@ -2593,14 +2827,12 @@ function renderOptionInspector(game, node, option) {
 
       <div class="field-group">
         <label>Set Variable Display</label>
-        <select class="field" data-option-field="effectDisplayMode">
-          ${DISPLAY_OPTIONS.map(
-            (display) =>
-              `<option value="${display.value}" ${
-                option.effectDisplayMode === display.value ? "selected" : ""
-              }>${escapeHtml(display.label)}</option>`
-          ).join("")}
-        </select>
+        ${renderSelectControl({
+          menuId: `option:${option.id}:effectDisplayMode`,
+          value: option.effectDisplayMode,
+          attributes: { "data-option-field": "effectDisplayMode" },
+          options: DISPLAY_OPTIONS,
+        })}
       </div>
 
       ${
@@ -2642,15 +2874,6 @@ function renderOptionInspector(game, node, option) {
         }
       </div>
 
-      <div class="item-actions">
-        <button class="button small ghost" type="button" data-action="move-option-up" ${
-          optionIndex <= 0 ? "disabled" : ""
-        }>Move Up</button>
-        <button class="button small ghost" type="button" data-action="move-option-down" ${
-          optionIndex >= node.options.length - 1 ? "disabled" : ""
-        }>Move Down</button>
-        <button class="button small ghost" type="button" data-action="delete-option">Delete Option</button>
-      </div>
     </div>
   `;
 }
@@ -2661,59 +2884,68 @@ function renderRequirementEditor(game, requirement) {
     ? `<input class="field" type="number" data-requirement-id="${escapeAttr(
         requirement.id
       )}" data-requirement-field="value" value="${escapeAttr(String(requirement.value))}" />`
-    : `<select class="field" data-requirement-id="${escapeAttr(
-        requirement.id
-      )}" data-requirement-field="state">${renderStatefulRequirementOptions(
-        game,
-        requirement.kind,
-        requirement.targetId,
-        requirement.state
-      )}</select>`;
+    : renderSelectControl({
+        menuId: `requirement:${requirement.id}:state`,
+        value: requirement.state ?? "__NULL__",
+        attributes: {
+          "data-requirement-id": requirement.id,
+          "data-requirement-field": "state",
+        },
+        options: getStatefulRequirementOptions(game, requirement.kind, requirement.targetId),
+      });
   const variableOptions = isInteger
-    ? game.trackers
-        .map(
-          (tracker) =>
-            `<option value="${escapeAttr(tracker.id)}" ${
-              requirement.targetId === tracker.id ? "selected" : ""
-            }>${escapeHtml(tracker.name)}</option>`
-        )
-        .join("")
-    : getVariableOptions(game, requirement.kind, requirement.targetId);
+    ? game.trackers.map((tracker) => ({ value: tracker.id, label: tracker.name }))
+    : getVariableOptions(game, requirement.kind);
 
   return `
     <div class="item-card">
       <div class="inline-form">
         <div class="field-group">
           <label>Variable Type</label>
-          <select class="field" data-requirement-id="${escapeAttr(requirement.id)}" data-requirement-field="kind">
-            <option value="tracker" ${requirement.kind === "tracker" ? "selected" : ""}>Integer</option>
-            <option value="flag" ${requirement.kind === "flag" ? "selected" : ""}>Enum</option>
-            <option value="profile" ${requirement.kind === "profile" ? "selected" : ""}>Profile</option>
-          </select>
+          ${renderSelectControl({
+            menuId: `requirement:${requirement.id}:kind`,
+            value: requirement.kind,
+            attributes: {
+              "data-requirement-id": requirement.id,
+              "data-requirement-field": "kind",
+            },
+            options: [
+              { value: "tracker", label: "Integer" },
+              { value: "flag", label: "Enum" },
+              { value: "profile", label: "Profile" },
+            ],
+          })}
         </div>
         <div class="field-group">
           <label>Variable</label>
-          <select class="field" data-requirement-id="${escapeAttr(requirement.id)}" data-requirement-field="targetId">
-            ${variableOptions}
-          </select>
+          ${renderSelectControl({
+            menuId: `requirement:${requirement.id}:targetId`,
+            value: requirement.targetId || "",
+            attributes: {
+              "data-requirement-id": requirement.id,
+              "data-requirement-field": "targetId",
+            },
+            options: variableOptions,
+          })}
         </div>
       </div>
       <div class="inline-form">
         <div class="field-group">
           <label>Operator</label>
-          <select class="field" data-requirement-id="${escapeAttr(requirement.id)}" data-requirement-field="operator">
-            ${
-              isInteger
-                ? TRACKER_OPERATORS.map(
-                    (operator) =>
-                      `<option value="${operator}" ${
-                        requirement.operator === operator ? "selected" : ""
-                      }>${escapeHtml(operator)}</option>`
-                  ).join("")
-                : `<option value="=" ${requirement.operator === "=" ? "selected" : ""}>=</option>
-                   <option value="!=" ${requirement.operator === "!=" ? "selected" : ""}>!=</option>`
-            }
-          </select>
+          ${renderSelectControl({
+            menuId: `requirement:${requirement.id}:operator`,
+            value: requirement.operator,
+            attributes: {
+              "data-requirement-id": requirement.id,
+              "data-requirement-field": "operator",
+            },
+            options: isInteger
+              ? TRACKER_OPERATORS.map((operator) => ({ value: operator, label: operator }))
+              : [
+                  { value: "=", label: "=" },
+                  { value: "!=", label: "!=" },
+                ],
+          })}
         </div>
         <div class="field-group">
           <label>Value</label>
@@ -2723,14 +2955,15 @@ function renderRequirementEditor(game, requirement) {
       <div class="inline-form">
         <div class="field-group">
           <label>Logic</label>
-          <select class="field" data-requirement-id="${escapeAttr(requirement.id)}" data-requirement-field="joinMode">
-            ${REQUIREMENT_JOIN_OPTIONS.map(
-              (mode) =>
-                `<option value="${escapeAttr(mode.value)}" ${
-                  requirement.joinMode === mode.value ? "selected" : ""
-                }>${escapeHtml(mode.label)}</option>`
-            ).join("")}
-          </select>
+          ${renderSelectControl({
+            menuId: `requirement:${requirement.id}:joinMode`,
+            value: requirement.joinMode,
+            attributes: {
+              "data-requirement-id": requirement.id,
+              "data-requirement-field": "joinMode",
+            },
+            options: REQUIREMENT_JOIN_OPTIONS,
+          })}
         </div>
       </div>
       <div class="item-actions">
@@ -2747,27 +2980,37 @@ function renderVariableEffectEditor(game, effect, context = {}) {
   const extraData = buildDataAttributes(context.extraData);
   const actionOptions =
     effect.variableType === "tracker"
-      ? `
-          <option value="set" ${effect.action === "set" ? "selected" : ""}>set</option>
-          <option value="increase" ${effect.action === "increase" ? "selected" : ""}>increase</option>
-          <option value="decrease" ${effect.action === "decrease" ? "selected" : ""}>decrease</option>
-        `
-      : `<option value="set" selected>set</option>`;
+      ? [
+          { value: "set", label: "set" },
+          { value: "increase", label: "increase" },
+          { value: "decrease", label: "decrease" },
+        ]
+      : [{ value: "set", label: "set" }];
   const valueControl =
     effect.variableType === "flag"
-      ? `
-          <select class="field" data-variable-effect-id="${escapeAttr(effect.id)}" data-variable-effect-field="value" ${extraData}>
-            ${renderStatefulRequirementOptions(game, "flag", effect.variableId, effect.value)}
-          </select>
-        `
+      ? renderSelectControl({
+          menuId: `effect:${effect.id}:value`,
+          value: effect.value ?? "__NULL__",
+          attributes: {
+            "data-variable-effect-id": effect.id,
+            "data-variable-effect-field": "value",
+            ...(context.extraData || {}),
+          },
+          options: getStatefulRequirementOptions(game, "flag", effect.variableId),
+        })
       : effect.variableType === "profile"
-        ? `
-          <select class="field" data-variable-effect-id="${escapeAttr(effect.id)}" data-variable-effect-field="value" ${extraData}>
-            ${renderStatefulRequirementOptions(game, "profile", effect.variableId, effect.value)}
-          </select>
-        `
-      : effect.variableType === "string"
-        ? `<input class="field" data-variable-effect-id="${escapeAttr(effect.id)}" data-variable-effect-field="value" ${extraData} value="${escapeAttr(
+        ? renderSelectControl({
+            menuId: `effect:${effect.id}:value`,
+            value: effect.value ?? "__NULL__",
+            attributes: {
+              "data-variable-effect-id": effect.id,
+              "data-variable-effect-field": "value",
+              ...(context.extraData || {}),
+            },
+            options: getStatefulRequirementOptions(game, "profile", effect.variableId),
+          })
+        : effect.variableType === "string"
+          ? `<input class="field" data-variable-effect-id="${escapeAttr(effect.id)}" data-variable-effect-field="value" ${extraData} value="${escapeAttr(
             effect.value ?? ""
           )}" />`
         : `<input class="field" type="number" data-variable-effect-id="${escapeAttr(effect.id)}" data-variable-effect-field="value" ${extraData} value="${escapeAttr(
@@ -2778,26 +3021,49 @@ function renderVariableEffectEditor(game, effect, context = {}) {
       <div class="inline-form">
         <div class="field-group">
           <label>Action</label>
-          <select class="field" data-variable-effect-id="${escapeAttr(effect.id)}" data-variable-effect-field="action" ${extraData}>
-            ${actionOptions}
-          </select>
+          ${renderSelectControl({
+            menuId: `effect:${effect.id}:action`,
+            value: effect.action,
+            attributes: {
+              "data-variable-effect-id": effect.id,
+              "data-variable-effect-field": "action",
+              ...(context.extraData || {}),
+            },
+            options: actionOptions,
+          })}
         </div>
         <div class="field-group">
           <label>Variable Type</label>
-          <select class="field" data-variable-effect-id="${escapeAttr(effect.id)}" data-variable-effect-field="variableType" ${extraData}>
-            <option value="tracker" ${effect.variableType === "tracker" ? "selected" : ""}>Integer</option>
-            <option value="flag" ${effect.variableType === "flag" ? "selected" : ""}>Enum</option>
-            <option value="profile" ${effect.variableType === "profile" ? "selected" : ""}>Profile</option>
-            <option value="string" ${effect.variableType === "string" ? "selected" : ""}>String</option>
-          </select>
+          ${renderSelectControl({
+            menuId: `effect:${effect.id}:variableType`,
+            value: effect.variableType,
+            attributes: {
+              "data-variable-effect-id": effect.id,
+              "data-variable-effect-field": "variableType",
+              ...(context.extraData || {}),
+            },
+            options: [
+              { value: "tracker", label: "Integer" },
+              { value: "flag", label: "Enum" },
+              { value: "profile", label: "Profile" },
+              { value: "string", label: "String" },
+            ],
+          })}
         </div>
       </div>
       <div class="inline-form">
         <div class="field-group">
           <label>Variable</label>
-          <select class="field" data-variable-effect-id="${escapeAttr(effect.id)}" data-variable-effect-field="variableId" ${extraData}>
-            ${getVariableOptions(game, effect.variableType, effect.variableId)}
-          </select>
+          ${renderSelectControl({
+            menuId: `effect:${effect.id}:variableId`,
+            value: effect.variableId || "",
+            attributes: {
+              "data-variable-effect-id": effect.id,
+              "data-variable-effect-field": "variableId",
+              ...(context.extraData || {}),
+            },
+            options: getVariableOptions(game, effect.variableType),
+          })}
         </div>
         <div class="field-group">
           <label>Value</label>
@@ -2813,90 +3079,64 @@ function renderVariableEffectEditor(game, effect, context = {}) {
   `;
 }
 
-function getVariableOptions(game, variableType, selectedId) {
+function getVariableOptions(game, variableType) {
   const source =
     variableType === "flag"
       ? game.flags
       : variableType === "profile"
         ? game.profiles
-      : variableType === "string"
-        ? game.strings
-        : game.trackers;
+        : variableType === "string"
+          ? game.strings
+          : game.trackers;
 
-  return source
-    .map(
-      (entry) =>
-        `<option value="${escapeAttr(entry.id)}" ${selectedId === entry.id ? "selected" : ""}>${escapeHtml(
-          entry.name
-        )}</option>`
-    )
-    .join("");
+  return source.map((entry) => ({
+    value: entry.id,
+    label: entry.name || entry.id,
+  }));
 }
 
-function renderStatefulRequirementOptions(game, kind, variableId, selectedState) {
+function getStatefulRequirementOptions(game, kind, variableId) {
   if (kind === "profile") {
     const profile = getProfileById(game, variableId);
-    return renderStateOptions(profile?.states || [], selectedState);
+    return getStateOptions(profile?.states || []);
   }
-  return renderFlagStateOptions(game, variableId, selectedState);
+  return getFlagStateOptions(game, variableId);
 }
 
-function renderNodeOptions(game, selectedNodeId, chapterFilterId = null) {
+function getNodeOptions(game, chapterFilterId = null) {
   return game.nodes
     .filter((node) => !chapterFilterId || node.chapterId === chapterFilterId)
-    .map(
-      (node) =>
-        `<option value="${escapeAttr(node.id)}" ${
-          node.id === selectedNodeId ? "selected" : ""
-        }>${escapeHtml(node.name)}</option>`
-    )
-    .join("");
+    .map((node) => ({
+      value: node.id,
+      label: node.name || "Untitled message",
+    }));
 }
 
-function renderFlagStateOptions(game, flagId, selectedState) {
+function getFlagStateOptions(game, flagId) {
   const flag = getFlagById(game, flagId);
   const states = [null, ...(flag?.states ?? [])];
 
-  return states
-    .map((state) => {
-      const value = state === null ? "__NULL__" : state;
-      const label = state === null ? "null" : state;
-      return `<option value="${escapeAttr(value)}" ${
-        selectedState === state ? "selected" : ""
-      }>${escapeHtml(label)}</option>`;
-    })
-    .join("");
+  return states.map((state) => ({
+    value: state === null ? "__NULL__" : state,
+    label: state === null ? "null" : state,
+  }));
 }
 
-function renderStateOptions(states, selectedState) {
-  return [null, ...states]
-    .map((stateEntry) => {
-      const state = typeof stateEntry === "string" ? stateEntry : stateEntry?.name ?? null;
-      const value = state === null ? "__NULL__" : state;
-      const label = state === null ? "null" : state;
-      return `<option value="${escapeAttr(value)}" ${
-        selectedState === state ? "selected" : ""
-      }>${escapeHtml(label)}</option>`;
-    })
-    .join("");
+function getStateOptions(states) {
+  return [null, ...states].map((stateEntry) => {
+    const state = typeof stateEntry === "string" ? stateEntry : stateEntry?.name ?? null;
+    return {
+      value: state === null ? "__NULL__" : state,
+      label: state === null ? "null" : state,
+    };
+  });
 }
 
 function buildDataAttributes(attributes = {}) {
   return Object.entries(attributes)
+    .filter(([_key, value]) => value !== undefined && value !== null)
     .map(([key, value]) => `${key}="${escapeAttr(String(value))}"`)
     .join(" ");
-}
-
-function renderLocationOptions(game, selectedLocation) {
-  const locations = Array.from(new Set([...(game.world?.locations || []), selectedLocation || ""])).filter(Boolean);
-  return locations
-    .map(
-      (location) =>
-        `<option value="${escapeAttr(location)}" ${
-          selectedLocation === location ? "selected" : ""
-        }>${escapeHtml(location)}</option>`
-    )
-    .join("");
 }
 
 function renderGraph(game) {
@@ -2906,6 +3146,7 @@ function renderGraph(game) {
   if (!game.nodes.length && !game.clusters.length) {
     refs.graphNodes.innerHTML = `<div class="empty-graph">Add a message node to begin authoring.</div>`;
     refs.graphConnections.innerHTML = "";
+    refs.graphOverlays.innerHTML = "";
     return;
   }
 
@@ -2913,6 +3154,7 @@ function renderGraph(game) {
     .join("");
 
   refs.graphConnections.innerHTML = buildConnectionPaths(game);
+  refs.graphOverlays.innerHTML = renderGraphFloatingPanels(game);
 }
 
 function renderGraphCluster(game, cluster) {
@@ -2923,7 +3165,7 @@ function renderGraphCluster(game, cluster) {
     <article
       class="graph-cluster ${selectedCluster ? "selected" : ""}"
       data-cluster-id="${escapeAttr(cluster.id)}"
-      style="transform: translate(${cluster.position.x}px, ${cluster.position.y}px); z-index: ${selectedCluster ? 4 : 1};"
+      style="transform: translate(${cluster.position.x}px, ${cluster.position.y}px);"
     >
       <button class="cluster-handle cluster-handle-in" type="button" data-cluster-inlet-id="${escapeAttr(
         cluster.id
@@ -2948,7 +3190,7 @@ function renderGraphNode(game, node) {
     <article
       class="graph-node ${selectedNode ? "selected" : ""}"
       data-node-id="${escapeAttr(node.id)}"
-      style="transform: translate(${node.position.x}px, ${node.position.y}px); z-index: ${selectedNode ? 4 : 1};"
+      style="transform: translate(${node.position.x}px, ${node.position.y}px);"
     >
       <span class="node-inlet" data-node-inlet-id="${escapeAttr(node.id)}" data-connect-target-node-id="${escapeAttr(
         node.id
@@ -2989,34 +3231,32 @@ function renderGraphNode(game, node) {
 }
 
 function renderNodeReadOnlyBody(game, node) {
-  const groupedOptions = groupNodeOptionsByParagraph(node);
   const secondaryLine = buildNodeSecondaryLine(game, node);
 
   return `
     <div class="node-readonly">
       ${secondaryLine ? `<p class="node-summary-secondary">${escapeHtml(secondaryLine)}</p>` : ""}
-      <div class="node-block-list">
-        ${node.paragraphs
-          .map((paragraph) =>
-            renderNodeParagraphReadOnlyRow(game, node, paragraph, groupedOptions.byParagraph.get(paragraph.id) || [])
-          )
-          .join("")}
-        ${
-          groupedOptions.ungrouped.length
-            ? `
-                <div class="node-options">
-                  ${groupedOptions.ungrouped.map((option) => renderNodeOptionRow(game, node, option)).join("")}
-                </div>
-              `
-            : ""
-        }
+      <div class="field-group">
+        <label>Paragraphs</label>
+        <div class="node-block-list">
+          ${node.paragraphs.map((paragraph) => renderNodeParagraphReadOnlyRow(game, node, paragraph)).join("")}
+        </div>
+      </div>
+      <div class="field-group">
+        <label>Options</label>
+        <div class="node-options">
+          ${
+            node.options.length
+              ? node.options.map((option) => renderNodeOptionRow(game, node, option)).join("")
+              : '<div class="node-option"><div class="node-option-meta"><strong>No options yet.</strong><small>Add an option to branch from this message.</small></div></div>'
+          }
+        </div>
       </div>
     </div>
   `;
 }
 
 function renderNodeInlineEditor(game, node) {
-  const groupedOptions = groupNodeOptionsByParagraph(node);
   return `
     <div class="node-edit-grid">
       <label class="node-toggle">
@@ -3032,60 +3272,44 @@ function renderNodeInlineEditor(game, node) {
         )}" />
       </div>
       <div class="field-group">
-        <label>Info text</label>
+        <label>Subtitle</label>
         <input class="field" data-node-id="${escapeAttr(node.id)}" data-node-field="secondary" value="${escapeAttr(
           node.secondary
         )}" />
       </div>
-      <div class="inline-form">
-        <div class="field-group">
-          <label>Time</label>
-          <input class="field" type="time" data-node-id="${escapeAttr(node.id)}" data-node-field="time" value="${escapeAttr(
-            node.time || ""
-          )}" />
-        </div>
-        <div class="field-group">
-          <label>Location</label>
-          <select class="field" data-node-id="${escapeAttr(node.id)}" data-node-field="location">
-            <option value="">Unassigned</option>
-            ${renderLocationOptions(game, node.location)}
-          </select>
-        </div>
-      </div>
       <div class="field-group">
         <label>Chapter</label>
-        <select class="field" data-node-id="${escapeAttr(node.id)}" data-node-field="chapterId">
-          ${game.chapters
-            .map(
-              (chapter) =>
-                `<option value="${escapeAttr(chapter.id)}" ${
-                  node.chapterId === chapter.id ? "selected" : ""
-                }>${escapeHtml(chapter.name)}</option>`
-            )
-            .join("")}
-        </select>
+        ${renderSelectControl({
+          menuId: `node:${node.id}:chapterId`,
+          value: node.chapterId || "",
+          attributes: {
+            "data-node-id": node.id,
+            "data-node-field": "chapterId",
+          },
+          options: game.chapters.map((chapter) => ({
+            value: chapter.id,
+            label: chapter.name,
+          })),
+        })}
       </div>
       <div class="field-group">
         <label>Paragraphs</label>
         <div class="node-block-list">
-          ${node.paragraphs
-            .map((paragraph) =>
-              renderNodeParagraphRow(game, node, paragraph, groupedOptions.byParagraph.get(paragraph.id) || [])
-            )
-            .join("")}
+          ${node.paragraphs.map((paragraph) => renderNodeParagraphRow(game, node, paragraph)).join("")}
           <div class="node-option-add">
             <button class="list-add-fab node-add-fab" type="button" data-action="add-paragraph-inline" data-node-id="${escapeAttr(
               node.id
             )}" title="Add paragraph">+</button>
           </div>
+        </div>
+      </div>
+      <div class="field-group">
+        <label>Options</label>
+        <div class="node-options">
           ${
-            groupedOptions.ungrouped.length
-              ? `
-                  <div class="node-options">
-                    ${groupedOptions.ungrouped.map((option) => renderNodeOptionRow(game, node, option)).join("")}
-                  </div>
-                `
-              : '<div class="node-option"><div class="node-option-meta"><strong>No trailing options.</strong><small>Options with matching variable checks appear under their paragraph.</small></div></div>'
+            node.options.length
+              ? node.options.map((option) => renderNodeOptionRow(game, node, option)).join("")
+              : '<div class="node-option"><div class="node-option-meta"><strong>No options yet.</strong><small>Add an option to branch from this message.</small></div></div>'
           }
           <div class="node-option-add">
             <button class="list-add-fab node-add-fab" type="button" data-action="add-option-inline" data-node-id="${escapeAttr(
@@ -3098,7 +3322,7 @@ function renderNodeInlineEditor(game, node) {
   `;
 }
 
-function renderNodeParagraphReadOnlyRow(game, node, paragraph, attachedOptions) {
+function renderNodeParagraphReadOnlyRow(_game, node, paragraph) {
   const hasText = paragraph.text.trim().length > 0;
 
   return `
@@ -3115,80 +3339,33 @@ function renderNodeParagraphReadOnlyRow(game, node, paragraph, attachedOptions) 
           ? `<p class="node-paragraph-copy">${escapeHtml(paragraph.text)}</p>`
           : `<p class="node-paragraph-copy node-paragraph-copy-empty">No text yet.</p>`
       }
-      ${
-        attachedOptions.length
-          ? `<div class="node-paragraph-options">${attachedOptions
-              .map((option) => renderNodeOptionRow(game, node, option))
-              .join("")}</div>`
-          : ""
-      }
     </div>
   `;
 }
 
-function renderNodeParagraphRow(game, node, paragraph, attachedOptions) {
+function renderNodeParagraphRow(_game, node, paragraph) {
   const selectedParagraph = appState.selection.nodeId === node.id && appState.selection.paragraphId === paragraph.id;
-  const menuKey = buildParagraphMenuKey(node.id, paragraph.id);
-  const menuOpen = appState.selection.paragraphMenuId === menuKey;
-  const paragraphIndex = node.paragraphs.findIndex((entry) => entry.id === paragraph.id);
+  const draggingParagraph =
+    appState.drag?.type === "reorderParagraph" && appState.drag.nodeId === node.id && appState.drag.itemId === paragraph.id;
 
   return `
-    <div class="node-paragraph ${selectedParagraph ? "selected" : ""}" data-node-id="${escapeAttr(
+    <div class="node-paragraph ${selectedParagraph ? "selected" : ""} ${draggingParagraph ? "is-dragging" : ""}" data-node-id="${escapeAttr(
       node.id
     )}" data-paragraph-id="${escapeAttr(paragraph.id)}">
       <div class="node-block-head">
         <div class="node-rule-icons">
           ${renderRequirementIcons(paragraph.requirements, "paragraph")}
         </div>
-        <div class="menu-wrap">
-          <button class="button small ghost menu-button node-menu-button" type="button" data-action="toggle-paragraph-menu" data-node-id="${escapeAttr(
-            node.id
-          )}" data-paragraph-id="${escapeAttr(paragraph.id)}">···</button>
-          ${
-            menuOpen
-              ? `
-                  <div class="popover-menu">
-                    <button class="popover-item" type="button" data-action="edit-paragraph-settings" data-node-id="${escapeAttr(
-                      node.id
-                    )}" data-paragraph-id="${escapeAttr(paragraph.id)}">Edit settings</button>
-                    <button class="popover-item" type="button" data-action="move-paragraph-up" data-node-id="${escapeAttr(
-                      node.id
-                    )}" data-paragraph-id="${escapeAttr(paragraph.id)}" ${paragraphIndex <= 0 ? "disabled" : ""}>Move up</button>
-                    <button class="popover-item" type="button" data-action="move-paragraph-down" data-node-id="${escapeAttr(
-                      node.id
-                    )}" data-paragraph-id="${escapeAttr(paragraph.id)}" ${
-                      paragraphIndex >= node.paragraphs.length - 1 ? "disabled" : ""
-                    }>Move down</button>
-                    <button class="popover-item" type="button" data-action="duplicate-paragraph-inline" data-node-id="${escapeAttr(
-                      node.id
-                    )}" data-paragraph-id="${escapeAttr(paragraph.id)}">Duplicate</button>
-                    <button class="popover-item" type="button" data-action="delete-paragraph-inline" data-node-id="${escapeAttr(
-                      node.id
-                    )}" data-paragraph-id="${escapeAttr(paragraph.id)}" ${
-                      node.paragraphs.length === 1 ? "disabled" : ""
-                    }>Delete</button>
-                  </div>
-                `
-              : ""
-          }
-        </div>
       </div>
-      <textarea class="textarea node-paragraph-text" data-node-id="${escapeAttr(node.id)}" data-paragraph-id="${escapeAttr(
-        paragraph.id
-      )}" data-paragraph-field="text">${escapeHtml(paragraph.text)}</textarea>
-      ${
-        attachedOptions.length
-          ? `<div class="node-paragraph-options">${attachedOptions
-              .map((option) => renderNodeOptionRow(game, node, option))
-              .join("")}</div>`
-          : ""
-      }
+      <div class="node-paragraph-text node-text-static">${escapeHtml(paragraph.text)}</div>
     </div>
   `;
 }
 
 function renderNodeOptionRow(game, node, option) {
   const selectedOption = appState.selection.nodeId === node.id && appState.selection.optionId === option.id;
+  const draggingOption =
+    appState.drag?.type === "reorderOption" && appState.drag.nodeId === node.id && appState.drag.itemId === option.id;
   const cluster = option.targetClusterId ? getClusterById(game, option.targetClusterId) : null;
   const targetNodeId = resolveOptionTargetNodeId(game, option);
   const targetLabel =
@@ -3199,7 +3376,7 @@ function renderNodeOptionRow(game, node, option) {
       : formatTerminalLabel(option.terminal);
 
   return `
-    <div class="node-option ${selectedOption ? "selected" : ""}" data-node-id="${escapeAttr(node.id)}" data-option-id="${escapeAttr(
+    <div class="node-option ${selectedOption ? "selected" : ""} ${draggingOption ? "is-dragging" : ""}" data-node-id="${escapeAttr(node.id)}" data-option-id="${escapeAttr(
       option.id
     )}">
       <div class="node-block-head">
@@ -3208,19 +3385,70 @@ function renderNodeOptionRow(game, node, option) {
         </div>
       </div>
       <div class="node-option-meta">
-        ${
-          appState.selection.nodeId === node.id
-            ? `<textarea class="node-option-text" data-node-id="${escapeAttr(node.id)}" data-option-id="${escapeAttr(
-                option.id
-              )}" data-option-field="text">${escapeHtml(option.text)}</textarea>`
-            : `<strong>${escapeHtml(option.text || "Untitled option")}</strong>`
-        }
+        <div class="node-option-text node-text-static">${escapeHtml(option.text)}</div>
         <small>${escapeHtml(targetLabel)}</small>
       </div>
       <div class="node-option-actions">
         <button class="option-handle" type="button" data-connect-option-id="${escapeAttr(
           option.id
         )}" data-node-id="${escapeAttr(node.id)}" title="Connect option"></button>
+      </div>
+    </div>
+  `;
+}
+
+function renderGraphFloatingPanels(game) {
+  const parts = [];
+
+  if (appState.selection.paragraphMenuId) {
+    const [nodeId, paragraphId] = appState.selection.paragraphMenuId.split(":");
+    const node = getNodeById(game, nodeId);
+    const paragraph = getParagraphById(node, paragraphId);
+    const anchor = getFloatingPanelAnchor(`.node-paragraph[data-node-id="${nodeId}"][data-paragraph-id="${paragraphId}"]`);
+    if (node && paragraph && anchor) {
+      parts.push(renderParagraphFloatingMenu(game, node, paragraph, anchor));
+    }
+  }
+
+  if (appState.selection.optionMenuId) {
+    const [nodeId, optionId] = appState.selection.optionMenuId.split(":");
+    const node = getNodeById(game, nodeId);
+    const option = getOptionById(node, optionId);
+    const anchor = getFloatingPanelAnchor(`.node-option[data-node-id="${nodeId}"][data-option-id="${optionId}"]`);
+    if (node && option && anchor) {
+      parts.push(renderOptionFloatingMenu(game, node, option, anchor));
+    }
+  }
+
+  return parts.join("");
+}
+
+function getFloatingPanelAnchor(selector) {
+  const element = refs.graphNodes.querySelector(selector);
+  if (!element) {
+    return null;
+  }
+
+  const rect = element.getBoundingClientRect();
+  const point = clientPointToWorld(rect.right + 8, rect.top + rect.height / 2);
+  return `left:${point.x}px; top:${point.y}px;`;
+}
+
+function renderParagraphFloatingMenu(game, node, paragraph, positionStyle) {
+  return `
+    <div class="floating-node-panel" style="${positionStyle}">
+      <div class="floating-node-panel-shell">
+        ${renderParagraphInspector(game, node, paragraph)}
+      </div>
+    </div>
+  `;
+}
+
+function renderOptionFloatingMenu(game, node, option, positionStyle) {
+  return `
+    <div class="floating-node-panel" style="${positionStyle}">
+      <div class="floating-node-panel-shell">
+        ${renderOptionInspector(game, node, option)}
       </div>
     </div>
   `;
@@ -3275,43 +3503,6 @@ function renderRuleIconSvg(kind) {
     default:
       return "";
   }
-}
-
-function groupNodeOptionsByParagraph(node) {
-  const byParagraph = new Map();
-  const usedOptionIds = new Set();
-
-  node.paragraphs.forEach((paragraph) => {
-    if (!paragraph.requirements.length) {
-      byParagraph.set(paragraph.id, []);
-      return;
-    }
-
-    const signature = getRequirementSignature(paragraph.requirements);
-    const matches = node.options.filter(
-      (option) => !usedOptionIds.has(option.id) && getRequirementSignature(option.requirements) === signature
-    );
-    matches.forEach((option) => usedOptionIds.add(option.id));
-    byParagraph.set(paragraph.id, matches);
-  });
-
-  return {
-    byParagraph,
-    ungrouped: node.options.filter((option) => !usedOptionIds.has(option.id)),
-  };
-}
-
-function getRequirementSignature(requirements) {
-  return JSON.stringify(
-    requirements.map((requirement) => ({
-      kind: requirement.kind,
-      joinMode: requirement.joinMode,
-      targetId: requirement.targetId,
-      operator: requirement.operator,
-      value: requirement.value,
-      state: requirement.state,
-    }))
-  );
 }
 
 function getNodeEditorBody(node) {
@@ -3831,6 +4022,10 @@ function exportEditorGame() {
 }
 
 function handleTabClick(event) {
+  if (handleSelectMenuAction(event.target.closest("[data-action]"))) {
+    return;
+  }
+
   const button = event.target.closest("[data-tab-id]");
   if (!button) {
     return;
@@ -3840,11 +4035,15 @@ function handleTabClick(event) {
   if (appState.createTab !== "trackers") {
     appState.selection.trackerMenuId = null;
   }
+  appState.selection.selectMenuId = null;
   renderCreateView();
 }
 
 function handleSidebarClick(event) {
   const actionElement = event.target.closest("[data-action]");
+  if (handleSelectMenuAction(actionElement)) {
+    return;
+  }
   const action = actionElement?.dataset.action;
   if (!action || !appState.createGame) {
     return;
@@ -3877,6 +4076,7 @@ function handleSidebarClick(event) {
       addTracker();
       break;
     case "toggle-tracker-menu":
+      appState.selection.selectMenuId = null;
       appState.selection.trackerMenuId =
         appState.selection.trackerMenuId === actionElement.dataset.trackerId ? null : actionElement.dataset.trackerId;
       renderCreateView();
@@ -3967,19 +4167,6 @@ function handleSidebarClick(event) {
       appState.createGame.strings = appState.createGame.strings.filter((entry) => entry.id !== actionElement.dataset.stringId);
       commitEditorChange();
       break;
-    case "add-location":
-      appState.createGame.world.locations.push(`Location ${appState.createGame.world.locations.length + 1}`);
-      commitEditorChange();
-      break;
-    case "delete-location":
-      appState.createGame.world.locations.splice(Number(actionElement.dataset.locationIndex), 1);
-      appState.createGame.nodes.forEach((node) => {
-        if (node.location && !appState.createGame.world.locations.includes(node.location)) {
-          node.location = "";
-        }
-      });
-      commitEditorChange();
-      break;
     default:
       break;
   }
@@ -3994,30 +4181,6 @@ function handleSidebarChange(event) {
 
   if (target.dataset.metaField) {
     appState.createGame.metadata[target.dataset.metaField] = target.value;
-    commitEditorChange();
-    return;
-  }
-
-  if (target.dataset.worldField) {
-    appState.createGame.world[target.dataset.worldField] = target.value;
-    commitEditorChange();
-    return;
-  }
-
-  if (target.dataset.locationIndex !== undefined) {
-    const index = Number(target.dataset.locationIndex);
-    const previous = appState.createGame.world.locations[index];
-    const nextValue = target.value.trim();
-    if (!nextValue) {
-      appState.createGame.world.locations.splice(index, 1);
-    } else {
-      appState.createGame.world.locations[index] = nextValue;
-    }
-    appState.createGame.nodes.forEach((node) => {
-      if (node.location === previous) {
-        node.location = nextValue;
-      }
-    });
     commitEditorChange();
     return;
   }
@@ -4148,20 +4311,83 @@ function handleSidebarChange(event) {
   }
 }
 
+function closeTransientCreateMenus() {
+  const hadOpenMenu =
+    appState.selection.trackerMenuId !== null ||
+    appState.selection.nodeMenuId !== null ||
+    appState.selection.paragraphMenuId !== null ||
+    appState.selection.optionMenuId !== null ||
+    appState.selection.floatingActionMenuId !== null ||
+    appState.selection.selectMenuId !== null;
+  if (!hadOpenMenu) {
+    return false;
+  }
+
+  appState.selection.trackerMenuId = null;
+  appState.selection.nodeMenuId = null;
+  appState.selection.paragraphMenuId = null;
+  appState.selection.optionMenuId = null;
+  appState.selection.floatingActionMenuId = null;
+  appState.selection.selectMenuId = null;
+  return true;
+}
+
 function handleDocumentMouseDown(event) {
-  if (appState.view === "create" && !event.target.closest(".menu-wrap")) {
-    const hadOpenMenu =
-      appState.selection.trackerMenuId !== null ||
-      appState.selection.nodeMenuId !== null ||
-      appState.selection.paragraphMenuId !== null;
-    if (hadOpenMenu) {
-      appState.selection.trackerMenuId = null;
-      appState.selection.nodeMenuId = null;
-      appState.selection.paragraphMenuId = null;
-      renderCreateView();
-      return;
+  if (
+    appState.view === "create" &&
+    !event.target.closest(
+      "#graphViewport, .menu-wrap, .floating-node-panel, .graph-node, .graph-cluster, .create-panel, .graph-floating-controls, button, input, textarea, select, label"
+    )
+  ) {
+    const closedMenu = closeTransientCreateMenus();
+    if (closedMenu) {
+      requestAnimationFrame(() => {
+        if (appState.view === "create") {
+          renderCreateView();
+        }
+      });
     }
   }
+}
+
+function handleSelectMenuAction(actionElement) {
+  const action = actionElement?.dataset.action;
+  if (action === "toggle-select-menu") {
+    appState.selection.trackerMenuId = null;
+    appState.selection.nodeMenuId = null;
+    appState.selection.paragraphMenuId = null;
+    appState.selection.optionMenuId = null;
+    appState.selection.selectMenuId =
+      appState.selection.selectMenuId === actionElement.dataset.selectMenuId
+        ? null
+        : actionElement.dataset.selectMenuId;
+    renderCreateView();
+    return true;
+  }
+
+  if (action !== "select-menu-option") {
+    return false;
+  }
+
+  const menuElement = actionElement.closest("[data-select-menu-id]");
+  const input = menuElement?.querySelector(".select-menu-input");
+  if (!input) {
+    appState.selection.selectMenuId = null;
+    renderCreateView();
+    return true;
+  }
+
+  const nextValue = actionElement.dataset.selectMenuValue ?? "";
+  const changed = input.value !== nextValue;
+  input.value = nextValue;
+  appState.selection.selectMenuId = null;
+
+  if (changed) {
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  } else {
+    renderCreateView();
+  }
+  return true;
 }
 
 function handleGraphClick(event) {
@@ -4175,6 +4401,15 @@ function handleGraphClick(event) {
   }
 
   const actionElement = event.target.closest("[data-action]");
+  if (handleSelectMenuAction(actionElement)) {
+    return;
+  }
+  if (event.target.closest(".floating-node-panel")) {
+    if (actionElement) {
+      handleInspectorClick(event);
+    }
+    return;
+  }
   if (actionElement) {
     switch (actionElement.dataset.action) {
       case "toggle-node-menu":
@@ -4184,8 +4419,11 @@ function handleGraphClick(event) {
         appState.selection.optionId = null;
         appState.selection.trackerMenuId = null;
         appState.selection.paragraphMenuId = null;
+        appState.selection.optionMenuId = null;
+        appState.selection.selectMenuId = null;
         appState.selection.nodeMenuId =
           appState.selection.nodeMenuId === actionElement.dataset.nodeId ? null : actionElement.dataset.nodeId;
+        appState.selection.floatingActionMenuId = null;
         renderCreateView();
         return;
       case "toggle-paragraph-menu": {
@@ -4196,7 +4434,25 @@ function handleGraphClick(event) {
         appState.selection.optionId = null;
         appState.selection.trackerMenuId = null;
         appState.selection.nodeMenuId = null;
+        appState.selection.optionMenuId = null;
+        appState.selection.selectMenuId = null;
+        appState.selection.floatingActionMenuId = null;
         appState.selection.paragraphMenuId = appState.selection.paragraphMenuId === menuKey ? null : menuKey;
+        renderCreateView();
+        return;
+      }
+      case "toggle-option-menu": {
+        const menuKey = buildOptionMenuKey(actionElement.dataset.nodeId, actionElement.dataset.optionId);
+        appState.selection.nodeId = actionElement.dataset.nodeId;
+        appState.selection.clusterId = null;
+        appState.selection.paragraphId = null;
+        appState.selection.optionId = actionElement.dataset.optionId;
+        appState.selection.trackerMenuId = null;
+        appState.selection.nodeMenuId = null;
+        appState.selection.paragraphMenuId = null;
+        appState.selection.selectMenuId = null;
+        appState.selection.floatingActionMenuId = null;
+        appState.selection.optionMenuId = appState.selection.optionMenuId === menuKey ? null : menuKey;
         renderCreateView();
         return;
       }
@@ -4206,6 +4462,20 @@ function handleGraphClick(event) {
         appState.selection.paragraphId = actionElement.dataset.paragraphId;
         appState.selection.optionId = null;
         appState.selection.paragraphMenuId = null;
+        appState.selection.optionMenuId = null;
+        appState.selection.selectMenuId = null;
+        appState.selection.floatingActionMenuId = null;
+        renderCreateView();
+        return;
+      case "edit-option-settings":
+        appState.selection.nodeId = actionElement.dataset.nodeId;
+        appState.selection.clusterId = null;
+        appState.selection.paragraphId = null;
+        appState.selection.optionId = actionElement.dataset.optionId;
+        appState.selection.paragraphMenuId = null;
+        appState.selection.optionMenuId = null;
+        appState.selection.selectMenuId = null;
+        appState.selection.floatingActionMenuId = null;
         renderCreateView();
         return;
       case "add-paragraph-inline":
@@ -4224,6 +4494,9 @@ function handleGraphClick(event) {
         appState.selection.optionId = option.id;
         appState.selection.nodeMenuId = null;
         appState.selection.paragraphMenuId = null;
+        appState.selection.optionMenuId = buildOptionMenuKey(node.id, option.id);
+        appState.selection.selectMenuId = null;
+        appState.selection.floatingActionMenuId = null;
         commitEditorChange();
         return;
       }
@@ -4247,9 +4520,37 @@ function handleGraphClick(event) {
           1
         );
         return;
+      case "move-option-up":
+        moveOption(
+          actionElement.dataset.nodeId || appState.selection.nodeId,
+          actionElement.dataset.optionId || appState.selection.optionId,
+          -1
+        );
+        return;
+      case "move-option-down":
+        moveOption(
+          actionElement.dataset.nodeId || appState.selection.nodeId,
+          actionElement.dataset.optionId || appState.selection.optionId,
+          1
+        );
+        return;
       case "delete-paragraph-inline":
         deleteParagraph(actionElement.dataset.nodeId, actionElement.dataset.paragraphId);
         return;
+      case "delete-option-inline": {
+        const node = getNodeById(appState.createGame, actionElement.dataset.nodeId);
+        if (!node) {
+          return;
+        }
+        node.options = node.options.filter((option) => option.id !== actionElement.dataset.optionId);
+        appState.selection.nodeId = node.id;
+        appState.selection.clusterId = null;
+        appState.selection.paragraphId = null;
+        appState.selection.optionId = null;
+        appState.selection.optionMenuId = null;
+        commitEditorChange();
+        return;
+      }
       case "duplicate-node-inline":
         duplicateNode(actionElement.dataset.nodeId);
         return;
@@ -4259,6 +4560,9 @@ function handleGraphClick(event) {
         appState.selection.paragraphId = null;
         appState.selection.optionId = null;
         appState.selection.nodeMenuId = null;
+        appState.selection.optionMenuId = null;
+        appState.selection.selectMenuId = null;
+        appState.selection.floatingActionMenuId = null;
         deleteSelectedNode();
         return;
       default:
@@ -4279,6 +4583,9 @@ function handleGraphClick(event) {
     appState.selection.trackerMenuId = null;
     appState.selection.nodeMenuId = null;
     appState.selection.paragraphMenuId = null;
+    appState.selection.optionMenuId = buildOptionMenuKey(optionElement.dataset.nodeId, optionElement.dataset.optionId);
+    appState.selection.floatingActionMenuId = null;
+    appState.selection.selectMenuId = null;
     renderCreateView();
     return;
   }
@@ -4291,7 +4598,13 @@ function handleGraphClick(event) {
     appState.selection.optionId = null;
     appState.selection.trackerMenuId = null;
     appState.selection.nodeMenuId = null;
-    appState.selection.paragraphMenuId = null;
+    appState.selection.paragraphMenuId = buildParagraphMenuKey(
+      paragraphElement.dataset.nodeId,
+      paragraphElement.dataset.paragraphId
+    );
+    appState.selection.optionMenuId = null;
+    appState.selection.floatingActionMenuId = null;
+    appState.selection.selectMenuId = null;
     renderCreateView();
     return;
   }
@@ -4305,6 +4618,9 @@ function handleGraphClick(event) {
     appState.selection.trackerMenuId = null;
     appState.selection.nodeMenuId = null;
     appState.selection.paragraphMenuId = null;
+    appState.selection.optionMenuId = null;
+    appState.selection.floatingActionMenuId = null;
+    appState.selection.selectMenuId = null;
     renderCreateView();
     return;
   }
@@ -4318,6 +4634,9 @@ function handleGraphClick(event) {
     appState.selection.trackerMenuId = null;
     appState.selection.nodeMenuId = null;
     appState.selection.paragraphMenuId = null;
+    appState.selection.optionMenuId = null;
+    appState.selection.floatingActionMenuId = null;
+    appState.selection.selectMenuId = null;
     renderCreateView();
     return;
   }
@@ -4333,7 +4652,10 @@ function clearEditorSelection() {
     appState.selection.optionId !== null ||
     appState.selection.trackerMenuId !== null ||
     appState.selection.nodeMenuId !== null ||
-    appState.selection.paragraphMenuId !== null;
+    appState.selection.paragraphMenuId !== null ||
+    appState.selection.optionMenuId !== null ||
+    appState.selection.floatingActionMenuId !== null ||
+    appState.selection.selectMenuId !== null;
   appState.selection.nodeId = null;
   appState.selection.clusterId = null;
   appState.selection.paragraphId = null;
@@ -4341,6 +4663,9 @@ function clearEditorSelection() {
   appState.selection.trackerMenuId = null;
   appState.selection.nodeMenuId = null;
   appState.selection.paragraphMenuId = null;
+  appState.selection.optionMenuId = null;
+  appState.selection.floatingActionMenuId = null;
+  appState.selection.selectMenuId = null;
   if (hadSelection) {
     renderCreateView();
   }
@@ -4351,6 +4676,10 @@ function handleGraphFocusIn(event) {
     return;
   }
 
+  if (event.target.closest(".floating-node-panel")) {
+    return;
+  }
+
   const paragraphElement = event.target.closest("[data-paragraph-id]");
   const optionElement = event.target.closest("[data-option-id]");
   if (optionElement) {
@@ -4358,7 +4687,10 @@ function handleGraphFocusIn(event) {
     appState.selection.clusterId = null;
     appState.selection.paragraphId = null;
     appState.selection.optionId = optionElement.dataset.optionId;
-    renderInspector(appState.createGame);
+    appState.selection.paragraphMenuId = null;
+    appState.selection.optionMenuId = buildOptionMenuKey(optionElement.dataset.nodeId, optionElement.dataset.optionId);
+    appState.selection.floatingActionMenuId = null;
+    renderCreateView();
     return;
   }
 
@@ -4367,7 +4699,13 @@ function handleGraphFocusIn(event) {
     appState.selection.clusterId = null;
     appState.selection.paragraphId = paragraphElement.dataset.paragraphId;
     appState.selection.optionId = null;
-    renderInspector(appState.createGame);
+    appState.selection.paragraphMenuId = buildParagraphMenuKey(
+      paragraphElement.dataset.nodeId,
+      paragraphElement.dataset.paragraphId
+    );
+    appState.selection.optionMenuId = null;
+    appState.selection.floatingActionMenuId = null;
+    renderCreateView();
     return;
   }
 
@@ -4401,6 +4739,12 @@ function handleNodeDragStart(event) {
 
   const optionHandle = event.target.closest("[data-connect-option-id]");
   if (optionHandle) {
+    appState.selection.nodeId = optionHandle.dataset.nodeId;
+    appState.selection.clusterId = null;
+    appState.selection.paragraphId = null;
+    appState.selection.optionId = optionHandle.dataset.connectOptionId;
+    appState.selection.optionMenuId = null;
+    appState.selection.floatingActionMenuId = null;
     appState.drag = {
       type: "connect",
       nodeId: optionHandle.dataset.nodeId,
@@ -4408,7 +4752,35 @@ function handleNodeDragStart(event) {
       pointerX: event.clientX,
       pointerY: event.clientY,
     };
-    refs.graphConnections.innerHTML = buildConnectionPaths(appState.createGame);
+    renderCreateView();
+    event.preventDefault();
+    return;
+  }
+
+  const paragraphRow = event.target.closest(".node-paragraph[data-paragraph-id]");
+  if (paragraphRow && !event.target.closest("button, input, textarea, select, label, .floating-node-panel")) {
+    appState.drag = {
+      type: "reorderParagraph",
+      nodeId: paragraphRow.dataset.nodeId,
+      itemId: paragraphRow.dataset.paragraphId,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+    };
+    event.preventDefault();
+    return;
+  }
+
+  const optionRow = event.target.closest(".node-option[data-option-id]");
+  if (optionRow && !event.target.closest("button, input, textarea, select, label, .floating-node-panel")) {
+    appState.drag = {
+      type: "reorderOption",
+      nodeId: optionRow.dataset.nodeId,
+      itemId: optionRow.dataset.optionId,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+    };
     event.preventDefault();
     return;
   }
@@ -4465,7 +4837,7 @@ function handleViewportPanStart(event) {
     return;
   }
 
-  if (event.target.closest(".graph-node, .graph-cluster, .create-panel, .graph-floating-controls")) {
+  if (event.target.closest(".graph-node, .graph-cluster, .floating-node-panel, .create-panel, .graph-floating-controls")) {
     return;
   }
 
@@ -4487,7 +4859,7 @@ function handleGraphWheel(event) {
     return;
   }
 
-  if (event.target.closest(".create-panel, input, textarea, select")) {
+  if (event.target.closest(".floating-node-panel, .create-panel, input, textarea, select")) {
     return;
   }
 
@@ -4566,6 +4938,11 @@ function handleDocumentDrag(event) {
     return;
   }
 
+  if (appState.drag.type === "reorderParagraph" || appState.drag.type === "reorderOption") {
+    updateReorderDrag(event);
+    return;
+  }
+
   if (appState.drag.type === "connect" || appState.drag.type === "connectCluster") {
     appState.drag.pointerX = event.clientX;
     appState.drag.pointerY = event.clientY;
@@ -4588,6 +4965,11 @@ function handleDocumentDragEnd(event) {
     persistEditorDraft();
   } else if (appState.drag.type === "cluster") {
     persistEditorDraft();
+  } else if (appState.drag.type === "reorderParagraph" || appState.drag.type === "reorderOption") {
+    if (appState.drag.moved) {
+      persistEditorDraft();
+      appState.graph.suppressNextGraphClick = true;
+    }
   } else if ((appState.drag.type === "connect" || appState.drag.type === "connectCluster") && appState.createGame) {
     const targetElement = event.target.closest("[data-connect-target-node-id]");
     const clusterTargetElement = event.target.closest("[data-connect-target-cluster-id]");
@@ -4662,10 +5044,65 @@ function handleDocumentDragEnd(event) {
   refs.graphViewport.classList.remove("dragging");
 }
 
+function updateReorderDrag(event) {
+  const distanceX = event.clientX - appState.drag.startX;
+  const distanceY = event.clientY - appState.drag.startY;
+  if (!appState.drag.moved && Math.abs(distanceX) <= 3 && Math.abs(distanceY) <= 3) {
+    return;
+  }
+
+  if (!appState.drag.moved) {
+    appState.drag.moved = true;
+    appState.selection.nodeId = appState.drag.nodeId;
+    appState.selection.clusterId = null;
+    appState.selection.trackerMenuId = null;
+    appState.selection.nodeMenuId = null;
+    appState.selection.paragraphMenuId = null;
+    appState.selection.optionMenuId = null;
+    appState.selection.floatingActionMenuId = null;
+    appState.selection.selectMenuId = null;
+    if (appState.drag.type === "reorderParagraph") {
+      appState.selection.paragraphId = appState.drag.itemId;
+      appState.selection.optionId = null;
+    } else {
+      appState.selection.paragraphId = null;
+      appState.selection.optionId = appState.drag.itemId;
+    }
+    renderGraph(appState.createGame);
+  }
+
+  const selector =
+    appState.drag.type === "reorderParagraph"
+      ? ".node-paragraph[data-paragraph-id]"
+      : ".node-option[data-option-id]";
+  const overElement = document.elementFromPoint(event.clientX, event.clientY)?.closest(selector);
+  if (!overElement || overElement.dataset.nodeId !== appState.drag.nodeId) {
+    return;
+  }
+
+  const node = getNodeById(appState.createGame, appState.drag.nodeId);
+  if (!node) {
+    return;
+  }
+
+  const items = appState.drag.type === "reorderParagraph" ? node.paragraphs : node.options;
+  const currentIndex = items.findIndex((item) => item.id === appState.drag.itemId);
+  const targetId =
+    appState.drag.type === "reorderParagraph" ? overElement.dataset.paragraphId : overElement.dataset.optionId;
+  const targetIndex = items.findIndex((item) => item.id === targetId);
+  if (currentIndex < 0 || targetIndex < 0 || currentIndex === targetIndex) {
+    return;
+  }
+
+  const [item] = items.splice(currentIndex, 1);
+  items.splice(targetIndex, 0, item);
+  renderGraph(appState.createGame);
+}
+
 function shouldCreateNodeFromConnectDrop(target) {
   return Boolean(
     target.closest("#graphViewport") &&
-      !target.closest(".create-panel, .graph-floating-controls, .graph-node, .graph-cluster")
+      !target.closest(".floating-node-panel, .create-panel, .graph-floating-controls, .graph-node, .graph-cluster")
   );
 }
 
@@ -4696,14 +5133,26 @@ function addChapter() {
 }
 function handleInspectorClick(event) {
   const actionElement = event.target.closest("[data-action]");
+  if (handleSelectMenuAction(actionElement)) {
+    return;
+  }
   const action = actionElement?.dataset.action;
   if (!action || !appState.createGame) {
     return;
   }
 
   switch (action) {
+    case "toggle-floating-action-menu":
+      appState.selection.floatingActionMenuId =
+        appState.selection.floatingActionMenuId === actionElement.dataset.floatingActionMenuId
+          ? null
+          : actionElement.dataset.floatingActionMenuId;
+      renderCreateView();
+      break;
     case "clear-paragraph-selection":
       appState.selection.paragraphId = null;
+      appState.selection.paragraphMenuId = null;
+      appState.selection.floatingActionMenuId = null;
       renderCreateView();
       break;
     case "clear-cluster-selection":
@@ -4716,6 +5165,8 @@ function handleInspectorClick(event) {
         node.options.push(option);
         appState.selection.paragraphId = null;
         appState.selection.optionId = option.id;
+        appState.selection.optionMenuId = buildOptionMenuKey(node.id, option.id);
+        appState.selection.floatingActionMenuId = null;
       });
       commitEditorChange();
       break;
@@ -4725,12 +5176,19 @@ function handleInspectorClick(event) {
     case "clear-option-selection":
       appState.selection.paragraphId = null;
       appState.selection.optionId = null;
+      appState.selection.optionMenuId = null;
+      appState.selection.floatingActionMenuId = null;
       renderCreateView();
+      break;
+    case "duplicate-option-inline":
+      duplicateNodeOption(actionElement.dataset.nodeId || appState.selection.nodeId, actionElement.dataset.optionId || appState.selection.optionId);
       break;
     case "delete-option":
       withSelectedNode((node) => {
         node.options = node.options.filter((option) => option.id !== appState.selection.optionId);
         appState.selection.optionId = null;
+        appState.selection.optionMenuId = null;
+        appState.selection.floatingActionMenuId = null;
       });
       commitEditorChange();
       break;
@@ -4769,6 +5227,21 @@ function handleInspectorClick(event) {
     case "delete-paragraph-inline":
       deleteParagraph(actionElement.dataset.nodeId || appState.selection.nodeId, actionElement.dataset.paragraphId || appState.selection.paragraphId);
       break;
+    case "delete-option-inline": {
+      const node = getNodeById(appState.createGame, actionElement.dataset.nodeId || appState.selection.nodeId);
+      const optionId = actionElement.dataset.optionId || appState.selection.optionId;
+      if (!node) {
+        break;
+      }
+      node.options = node.options.filter((option) => option.id !== optionId);
+      appState.selection.nodeId = node.id;
+      appState.selection.paragraphId = null;
+      appState.selection.optionId = null;
+      appState.selection.optionMenuId = null;
+      appState.selection.floatingActionMenuId = null;
+      commitEditorChange();
+      break;
+    }
     case "add-variable-check":
       withSelectedOption((option, game) => {
         option.requirements.push(createTrackerRequirement(game.trackers[0]?.id ?? null));
@@ -4960,7 +5433,10 @@ function handleGraphChange(event) {
       option.targetClusterId = null;
     }
     commitEditorChange();
+    return;
   }
+
+  handleInspectorChange(event);
 }
 
 function deleteChapter(chapterId) {
@@ -5092,8 +5568,6 @@ function duplicateNode(nodeId) {
 
   const duplicate = createNode(source.chapterId, source.name, {
     secondary: source.secondary,
-    time: source.time,
-    location: source.location,
   });
   duplicate.paragraphs = source.paragraphs.map(duplicateParagraphData);
   duplicate.isEndpoint = source.isEndpoint;
@@ -5108,6 +5582,7 @@ function duplicateNode(nodeId) {
   appState.selection.optionId = null;
   appState.selection.nodeMenuId = null;
   appState.selection.paragraphMenuId = null;
+  appState.selection.optionMenuId = null;
   commitEditorChange();
 }
 
@@ -5122,7 +5597,8 @@ function addParagraph(nodeId) {
   appState.selection.nodeId = node.id;
   appState.selection.paragraphId = paragraph.id;
   appState.selection.optionId = null;
-  appState.selection.paragraphMenuId = null;
+  appState.selection.paragraphMenuId = buildParagraphMenuKey(node.id, paragraph.id);
+  appState.selection.optionMenuId = null;
   commitEditorChange();
 }
 
@@ -5139,7 +5615,8 @@ function duplicateParagraph(nodeId, paragraphId) {
   appState.selection.nodeId = node.id;
   appState.selection.paragraphId = duplicate.id;
   appState.selection.optionId = null;
-  appState.selection.paragraphMenuId = null;
+  appState.selection.paragraphMenuId = buildParagraphMenuKey(node.id, duplicate.id);
+  appState.selection.optionMenuId = null;
   commitEditorChange();
 }
 
@@ -5168,7 +5645,8 @@ function moveParagraph(nodeId, paragraphId, direction) {
   appState.selection.nodeId = node.id;
   appState.selection.paragraphId = paragraphId;
   appState.selection.optionId = null;
-  appState.selection.paragraphMenuId = null;
+  appState.selection.paragraphMenuId = buildParagraphMenuKey(node.id, paragraphId);
+  appState.selection.optionMenuId = null;
   commitEditorChange();
 }
 
@@ -5183,6 +5661,26 @@ function deleteParagraph(nodeId, paragraphId) {
   appState.selection.paragraphId = node.paragraphs[0]?.id || null;
   appState.selection.optionId = null;
   appState.selection.paragraphMenuId = null;
+  appState.selection.optionMenuId = null;
+  appState.selection.floatingActionMenuId = null;
+  commitEditorChange();
+}
+
+function duplicateNodeOption(nodeId, optionId) {
+  const node = getNodeById(appState.createGame, nodeId);
+  const option = getOptionById(node, optionId);
+  if (!option) {
+    return;
+  }
+
+  const duplicate = duplicateOption(option, node.id, node.id);
+  const index = node.options.findIndex((entry) => entry.id === optionId);
+  node.options.splice(index + 1, 0, duplicate);
+  appState.selection.nodeId = node.id;
+  appState.selection.paragraphId = null;
+  appState.selection.optionId = duplicate.id;
+  appState.selection.optionMenuId = buildOptionMenuKey(node.id, duplicate.id);
+  appState.selection.floatingActionMenuId = null;
   commitEditorChange();
 }
 
@@ -5200,6 +5698,8 @@ function moveOption(nodeId, optionId, direction) {
   appState.selection.nodeId = node.id;
   appState.selection.paragraphId = null;
   appState.selection.optionId = optionId;
+  appState.selection.optionMenuId = buildOptionMenuKey(node.id, optionId);
+  appState.selection.floatingActionMenuId = null;
   commitEditorChange();
 }
 
@@ -5238,6 +5738,7 @@ function deleteSelectedNode() {
   appState.selection.optionId = null;
   appState.selection.nodeMenuId = null;
   appState.selection.paragraphMenuId = null;
+  appState.selection.optionMenuId = null;
   commitEditorChange();
 }
 
@@ -5332,17 +5833,15 @@ function moveNodeToChapter(node, nextChapterId) {
 function getNodeCreationTemplate(game, sourceNodeId) {
   const sourceNode =
     getNodeById(game, sourceNodeId) ||
-    [...game.nodes].reverse().find((node) => node.time || node.location) ||
+    [...game.nodes].reverse().find((node) => node.secondary) ||
     null;
 
   if (!sourceNode) {
-    return { secondary: "", time: "", location: "" };
+    return { secondary: "" };
   }
 
   return {
     secondary: "",
-    time: sourceNode.time ? addMinutesToTimeString(sourceNode.time, 3) : "",
-    location: sourceNode.location || "",
   };
 }
 
@@ -5400,6 +5899,9 @@ function normalizeEditorSelection() {
     appState.selection.optionId = null;
     appState.selection.nodeMenuId = null;
     appState.selection.paragraphMenuId = null;
+    appState.selection.optionMenuId = null;
+    appState.selection.floatingActionMenuId = null;
+    appState.selection.selectMenuId = null;
     return;
   }
 
@@ -5409,6 +5911,9 @@ function normalizeEditorSelection() {
     appState.selection.optionId = null;
     appState.selection.nodeMenuId = null;
     appState.selection.paragraphMenuId = null;
+    appState.selection.optionMenuId = null;
+    appState.selection.floatingActionMenuId = null;
+    appState.selection.selectMenuId = null;
   }
 
   if (appState.selection.clusterId && !getClusterById(appState.createGame, appState.selection.clusterId)) {
@@ -5429,6 +5934,34 @@ function normalizeEditorSelection() {
     const [nodeId, paragraphId] = appState.selection.paragraphMenuId.split(":");
     if (!getParagraphById(getNodeById(appState.createGame, nodeId), paragraphId)) {
       appState.selection.paragraphMenuId = null;
+    }
+  }
+  if (appState.selection.optionMenuId) {
+    const [nodeId, optionId] = appState.selection.optionMenuId.split(":");
+    if (!getOptionById(getNodeById(appState.createGame, nodeId), optionId)) {
+      appState.selection.optionMenuId = null;
+    }
+  }
+  if (appState.selection.floatingActionMenuId) {
+    const [kind, nodeId, itemId] = appState.selection.floatingActionMenuId.split(":");
+    const nodeForMenu = getNodeById(appState.createGame, nodeId);
+    const menuTarget =
+      kind === "paragraph"
+        ? getParagraphById(nodeForMenu, itemId)
+        : kind === "option"
+          ? getOptionById(nodeForMenu, itemId)
+          : null;
+    if (!menuTarget) {
+      appState.selection.floatingActionMenuId = null;
+    }
+  }
+  if (appState.selection.selectMenuId) {
+    const menuExists =
+      refs.editorSidebarContent.querySelector(`[data-select-menu-id="${escapeAttr(appState.selection.selectMenuId)}"]`) ||
+      refs.editorInspector.querySelector(`[data-select-menu-id="${escapeAttr(appState.selection.selectMenuId)}"]`) ||
+      refs.graphNodes.querySelector(`[data-select-menu-id="${escapeAttr(appState.selection.selectMenuId)}"]`);
+    if (!menuExists) {
+      appState.selection.selectMenuId = null;
     }
   }
 }
@@ -5475,8 +6008,6 @@ function createNode(chapterId, name = "", template = {}) {
     name,
     chapterId,
     secondary: template.secondary || "",
-    time: template.time || "",
-    location: template.location || "",
     paragraphs: [createParagraph("Write the system message here.")],
     position: {
       x: 160,
@@ -5539,6 +6070,14 @@ function getParagraphById(node, paragraphId) {
 
 function buildParagraphMenuKey(nodeId, paragraphId) {
   return `${nodeId}:${paragraphId}`;
+}
+
+function buildOptionMenuKey(nodeId, optionId) {
+  return `${nodeId}:${optionId}`;
+}
+
+function buildFloatingActionMenuKey(kind, nodeId, itemId) {
+  return `${kind}:${nodeId}:${itemId}`;
 }
 
 function duplicateOption(option, sourceNodeId, duplicateNodeId) {
@@ -6796,41 +7335,7 @@ function getGameCacheKey(game) {
 }
 
 function buildNodeSecondaryLine(game, node) {
-  const parts = [];
-  if (node.time) {
-    parts.push(formatClockTime(game?.world?.clockFormat || "24", node.time));
-  }
-  if (node.location) {
-    parts.push(node.location);
-  }
-  if (node.secondary) {
-    parts.push(node.secondary);
-  }
-  return parts.join(" • ");
-}
-
-function formatClockTime(clockFormat, time) {
-  if (!time) {
-    return "";
-  }
-  if (clockFormat === "12") {
-    const [hourString = "0", minuteString = "00"] = time.split(":");
-    const hour = Number(hourString);
-    const minute = String(minuteString).padStart(2, "0");
-    const suffix = hour >= 12 ? "PM" : "AM";
-    const normalizedHour = hour % 12 || 12;
-    return `${normalizedHour}:${minute} ${suffix}`;
-  }
-  return time;
-}
-
-function addMinutesToTimeString(time, delta) {
-  const [hourString = "0", minuteString = "0"] = time.split(":");
-  const totalMinutes = Number(hourString) * 60 + Number(minuteString) + delta;
-  const normalized = ((totalMinutes % 1440) + 1440) % 1440;
-  const hours = String(Math.floor(normalized / 60)).padStart(2, "0");
-  const minutes = String(normalized % 60).padStart(2, "0");
-  return `${hours}:${minutes}`;
+  return node.secondary || "";
 }
 
 function getNodeById(game, nodeId) {
