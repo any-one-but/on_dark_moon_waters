@@ -661,12 +661,24 @@ h3 {
   color: var(--text);
 }
 
+.graph-logic-node {
+  position: absolute;
+  min-width: 168px;
+  padding: 0;
+  color: var(--text);
+}
+
 .graph-node.selected {
   border-color: rgba(242, 200, 176, 0.55);
   box-shadow: 0 18px 44px rgba(221, 131, 84, 0.14);
 }
 
 .graph-cluster.selected .cluster-shell {
+  border-color: rgba(242, 200, 176, 0.55);
+  box-shadow: 0 16px 34px rgba(221, 131, 84, 0.12);
+}
+
+.graph-logic-node.selected .logic-node-shell {
   border-color: rgba(242, 200, 176, 0.55);
   box-shadow: 0 16px 34px rgba(221, 131, 84, 0.12);
 }
@@ -695,8 +707,27 @@ h3 {
   text-align: center;
 }
 
+.logic-node-shell {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  padding: 14px 22px;
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(15, 26, 36, 0.96), rgba(10, 20, 28, 0.92));
+  box-shadow: 0 12px 28px rgba(1, 7, 10, 0.22);
+  cursor: move;
+  text-align: center;
+}
+
 .cluster-label,
 .cluster-target {
+  margin: 0;
+}
+
+.logic-node-label,
+.logic-node-meta,
+.logic-node-target {
   margin: 0;
 }
 
@@ -713,7 +744,32 @@ h3 {
   color: var(--muted);
 }
 
+.logic-node-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-soft);
+}
+
+.logic-node-meta,
+.logic-node-target {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
 .cluster-handle {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(221, 131, 84, 0.65);
+  border-radius: 999px;
+  background: rgba(8, 17, 24, 0.96);
+  transform: translateY(-50%);
+}
+
+.logic-node-handle {
   position: absolute;
   top: 50%;
   width: 16px;
@@ -729,6 +785,15 @@ h3 {
 }
 
 .cluster-handle-out {
+  right: -8px;
+  cursor: crosshair;
+}
+
+.logic-node-handle-in {
+  left: -8px;
+}
+
+.logic-node-handle-out {
   right: -8px;
   cursor: crosshair;
 }
@@ -1663,6 +1728,9 @@ h3 {
             <button id="graphAddClusterButton" class="graph-fab" type="button" title="Add cluster">
               ◌
             </button>
+            <button id="graphAddLogicNodeButton" class="graph-fab" type="button" title="Add logic node">
+              ◇
+            </button>
             <button id="graphCenterButton" class="graph-fab" type="button" title="Center graph">
               ⌖
             </button>
@@ -1688,6 +1756,7 @@ const GRAPH_WORLD_HEIGHT = 3200;
 const NODE_WIDTH = 280;
 const NODE_HEADER_HEIGHT = 92;
 const NODE_OPTION_HEIGHT = 38;
+const LOGIC_EXECUTION_LIMIT = 128;
 
 const CREATE_TABS = [
   { id: "system", label: "System" },
@@ -1770,6 +1839,7 @@ const refs = {
   editorSidebarContent: document.getElementById("editorSidebarContent"),
   graphAddNodeButton: document.getElementById("graphAddNodeButton"),
   graphCenterButton: document.getElementById("graphCenterButton"),
+  graphAddLogicNodeButton: document.getElementById("graphAddLogicNodeButton"),
   graphZoomOutButton: document.getElementById("graphZoomOutButton"),
   graphZoomLabel: document.getElementById("graphZoomLabel"),
   graphZoomInButton: document.getElementById("graphZoomInButton"),
@@ -1797,11 +1867,13 @@ const appState = {
   createTab: "system",
   selection: {
     nodeId: null,
+    logicNodeId: null,
     clusterId: null,
     paragraphId: null,
     optionId: null,
     trackerMenuId: null,
     nodeMenuId: null,
+    logicNodeMenuId: null,
     paragraphMenuId: null,
     optionMenuId: null,
     floatingActionMenuId: null,
@@ -1868,6 +1940,7 @@ function bindGlobalEvents() {
   refs.menuOverlay.addEventListener("click", handleOverlayClick);
   refs.graphAddNodeButton.addEventListener("click", addNodeAtViewportCenter);
   refs.graphAddClusterButton.addEventListener("click", addClusterAtViewportCenter);
+  refs.graphAddLogicNodeButton.addEventListener("click", addLogicNodeAtViewportCenter);
   refs.graphCenterButton.addEventListener("click", centerGraph);
   refs.graphZoomInButton.addEventListener("click", () => zoomGraph(1.06));
   refs.graphZoomOutButton.addEventListener("click", () => zoomGraph(1 / 1.06));
@@ -2226,7 +2299,7 @@ function renderCreateView() {
   }
 
   refs.editorGameName.textContent = game.metadata.name || "Untitled Game";
-  refs.editorStatus.textContent = `${game.chapters.length} chapter${game.chapters.length === 1 ? "" : "s"} · ${game.nodes.length} message${game.nodes.length === 1 ? "" : "s"} · ${game.trackers.length} integer${game.trackers.length === 1 ? "" : "s"} · ${game.flags.length} enum${game.flags.length === 1 ? "" : "s"} · ${game.profiles.length} profile${game.profiles.length === 1 ? "" : "s"} · ${game.strings.length} string${game.strings.length === 1 ? "" : "s"}`;
+  refs.editorStatus.textContent = `${game.chapters.length} chapter${game.chapters.length === 1 ? "" : "s"} · ${game.nodes.length} message${game.nodes.length === 1 ? "" : "s"} · ${game.logicNodes.length} logic node${game.logicNodes.length === 1 ? "" : "s"} · ${game.trackers.length} integer${game.trackers.length === 1 ? "" : "s"} · ${game.flags.length} enum${game.flags.length === 1 ? "" : "s"} · ${game.profiles.length} profile${game.profiles.length === 1 ? "" : "s"} · ${game.strings.length} string${game.strings.length === 1 ? "" : "s"}`;
 
   renderEditorTabs();
   renderEditorSidebar(game);
@@ -2798,12 +2871,12 @@ function renderClusterInspector(game, cluster) {
         <input class="field" data-cluster-field="name" value="${escapeAttr(cluster.name)}" />
       </div>
       <div class="field-group">
-        <label>Target message</label>
+        <label>Target node</label>
         ${renderSelectControl({
           menuId: `cluster:${cluster.id}:targetNodeId`,
           value: cluster.targetNodeId || "",
           attributes: { "data-cluster-field": "targetNodeId" },
-          options: [{ value: "", label: "Unassigned" }, ...getNodeOptions(game)],
+          options: [{ value: "", label: "Unassigned" }, ...getPassTargetOptions(game)],
         })}
       </div>
       <div class="item-actions">
@@ -3018,6 +3091,355 @@ function renderOptionInspector(game, node, option) {
 
     </div>
   `;
+}
+
+function renderLogicNodeInspector(game, logicNode) {
+  return `
+    <div class="form-block">
+      <div class="floating-panel-head">
+        <strong>${escapeHtml(logicNode.name || "Logic Node")}</strong>
+        <div class="floating-panel-actions">
+          <button class="button small ghost panel-icon-button" type="button" data-action="clear-logic-node-selection" aria-label="Close logic panel">&times;</button>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label>Name</label>
+        <input class="field" data-logic-node-field="name" value="${escapeAttr(logicNode.name)}" />
+      </div>
+
+      <div class="field-group">
+        <label>Continue to</label>
+        ${renderSelectControl({
+          menuId: `logic:${logicNode.id}:targetNodeId`,
+          value: logicNode.targetNodeId || "",
+          attributes: { "data-logic-node-field": "targetNodeId" },
+          options: [{ value: "", label: "Unassigned" }, ...getPassTargetOptions(game)],
+        })}
+      </div>
+
+      <div class="item-card">
+        <div class="inline-row">
+          <strong>Triggers</strong>
+          <button class="button small secondary" type="button" data-action="add-logic-trigger">Add Trigger</button>
+        </div>
+        ${
+          logicNode.triggers.length
+            ? logicNode.triggers.map((trigger) => renderLogicTriggerEditor(game, trigger)).join("")
+            : '<p class="copy">No triggers configured.</p>'
+        }
+      </div>
+
+      <div class="item-card">
+        <div class="inline-row">
+          <strong>Actions</strong>
+          <button class="button small secondary" type="button" data-action="add-logic-action">Add Action</button>
+        </div>
+        ${
+          logicNode.actions.length
+            ? logicNode.actions.map((action) => renderLogicActionEditor(game, action)).join("")
+            : '<p class="copy">No actions configured.</p>'
+        }
+      </div>
+
+      <div class="item-actions">
+        <button class="button small ghost" type="button" data-action="duplicate-logic-node">Duplicate</button>
+        <button class="button small ghost" type="button" data-action="delete-logic-node">Delete</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderLogicTriggerEditor(game, trigger) {
+  const triggerTypeOptions = [
+    { value: "passSelf", label: "Player passes this logic node" },
+    { value: "passNode", label: "Player passes a node" },
+    { value: "passAnyNode", label: "Player passes any node" },
+    { value: "variableChange", label: "Variable changes" },
+    { value: "event", label: "Event happens" },
+  ];
+
+  return `
+    <div class="item-card">
+      <div class="inline-row">
+        <strong>Trigger</strong>
+        <button class="button small ghost" type="button" data-action="remove-logic-trigger" data-logic-trigger-id="${escapeAttr(
+          trigger.id
+        )}">Remove</button>
+      </div>
+      <div class="field-group">
+        <label>Type</label>
+        ${renderSelectControl({
+          menuId: `logic-trigger:${trigger.id}:kind`,
+          value: trigger.kind,
+          attributes: {
+            "data-logic-trigger-id": trigger.id,
+            "data-logic-trigger-field": "kind",
+          },
+          options: triggerTypeOptions,
+        })}
+      </div>
+      ${
+        trigger.kind === "passNode"
+          ? `
+            <div class="field-group">
+              <label>Node</label>
+              ${renderSelectControl({
+                menuId: `logic-trigger:${trigger.id}:targetNodeId`,
+                value: trigger.targetNodeId || "",
+                attributes: {
+                  "data-logic-trigger-id": trigger.id,
+                  "data-logic-trigger-field": "targetNodeId",
+                },
+                options: getPassTargetOptions(game),
+              })}
+            </div>
+          `
+          : ""
+      }
+      ${
+        trigger.kind === "variableChange"
+          ? renderLogicVariableChangeFields(game, trigger)
+          : ""
+      }
+      ${
+        trigger.kind === "event"
+          ? `
+            <div class="field-group">
+              <label>Event name</label>
+              <input class="field" data-logic-trigger-id="${escapeAttr(trigger.id)}" data-logic-trigger-field="eventName" value="${escapeAttr(
+                trigger.eventName
+              )}" />
+            </div>
+          `
+          : ""
+      }
+    </div>
+  `;
+}
+
+function renderLogicVariableChangeFields(game, trigger) {
+  return `
+    <div class="field-group">
+      <label>Variable type</label>
+      ${renderSelectControl({
+        menuId: `logic-trigger:${trigger.id}:variableType`,
+        value: trigger.variableType,
+        attributes: {
+          "data-logic-trigger-id": trigger.id,
+          "data-logic-trigger-field": "variableType",
+        },
+        options: [
+          { value: "tracker", label: "Integer" },
+          { value: "flag", label: "Enum" },
+          { value: "profile", label: "Profile" },
+          { value: "string", label: "String" },
+        ],
+      })}
+    </div>
+    <div class="field-group">
+      <label>Variable</label>
+      ${renderSelectControl({
+        menuId: `logic-trigger:${trigger.id}:variableId`,
+        value: trigger.variableId || "",
+        attributes: {
+          "data-logic-trigger-id": trigger.id,
+          "data-logic-trigger-field": "variableId",
+        },
+        options: getVariableOptions(game, trigger.variableType),
+      })}
+    </div>
+    <div class="field-group">
+      <label>Rule</label>
+      ${renderSelectControl({
+        menuId: `logic-trigger:${trigger.id}:operator`,
+        value: trigger.operator,
+        attributes: {
+          "data-logic-trigger-id": trigger.id,
+          "data-logic-trigger-field": "operator",
+        },
+        options: getLogicVariableTriggerOperatorOptions(trigger.variableType),
+      })}
+    </div>
+    ${
+      trigger.operator === "changed" || trigger.operator === "increase" || trigger.operator === "decrease"
+        ? ""
+        : `
+          <div class="field-group">
+            <label>Value</label>
+            ${renderLogicVariableValueEditor(game, trigger, "trigger")}
+          </div>
+        `
+    }
+  `;
+}
+
+function renderLogicActionEditor(game, action) {
+  const actionTypeOptions = [
+    { value: "emitEvent", label: "Emit event" },
+    { value: "changeVariable", label: "Change variable" },
+    { value: "jumpToNode", label: "Jump to node" },
+  ];
+
+  return `
+    <div class="item-card">
+      <div class="inline-row">
+        <strong>Action</strong>
+        <button class="button small ghost" type="button" data-action="remove-logic-action" data-logic-action-id="${escapeAttr(
+          action.id
+        )}">Remove</button>
+      </div>
+      <div class="field-group">
+        <label>Type</label>
+        ${renderSelectControl({
+          menuId: `logic-action:${action.id}:kind`,
+          value: action.kind,
+          attributes: {
+            "data-logic-action-id": action.id,
+            "data-logic-action-field": "kind",
+          },
+          options: actionTypeOptions,
+        })}
+      </div>
+      ${
+        action.kind === "emitEvent"
+          ? `
+            <div class="field-group">
+              <label>Event name</label>
+              <input class="field" data-logic-action-id="${escapeAttr(action.id)}" data-logic-action-field="eventName" value="${escapeAttr(
+                action.eventName
+              )}" />
+            </div>
+          `
+          : ""
+      }
+      ${
+        action.kind === "changeVariable"
+          ? `
+            <div class="field-group">
+              <label>Change</label>
+              ${renderSelectControl({
+                menuId: `logic-action:${action.id}:action`,
+                value: action.action,
+                attributes: {
+                  "data-logic-action-id": action.id,
+                  "data-logic-action-field": "action",
+                },
+                options:
+                  action.variableType === "tracker"
+                    ? [
+                        { value: "set", label: "Set to" },
+                        { value: "increase", label: "Increase by" },
+                        { value: "decrease", label: "Decrease by" },
+                      ]
+                    : [{ value: "set", label: "Set to" }],
+              })}
+            </div>
+            <div class="field-group">
+              <label>Variable type</label>
+              ${renderSelectControl({
+                menuId: `logic-action:${action.id}:variableType`,
+                value: action.variableType,
+                attributes: {
+                  "data-logic-action-id": action.id,
+                  "data-logic-action-field": "variableType",
+                },
+                options: [
+                  { value: "tracker", label: "Integer" },
+                  { value: "flag", label: "Enum" },
+                  { value: "profile", label: "Profile" },
+                  { value: "string", label: "String" },
+                ],
+              })}
+            </div>
+            <div class="field-group">
+              <label>Variable</label>
+              ${renderSelectControl({
+                menuId: `logic-action:${action.id}:variableId`,
+                value: action.variableId || "",
+                attributes: {
+                  "data-logic-action-id": action.id,
+                  "data-logic-action-field": "variableId",
+                },
+                options: getVariableOptions(game, action.variableType),
+              })}
+            </div>
+            <div class="field-group">
+              <label>Value</label>
+              ${renderLogicVariableValueEditor(game, action, "action")}
+            </div>
+          `
+          : ""
+      }
+      ${
+        action.kind === "jumpToNode"
+          ? `
+            <div class="field-group">
+              <label>Destination node</label>
+              ${renderSelectControl({
+                menuId: `logic-action:${action.id}:targetNodeId`,
+                value: action.targetNodeId || "",
+                attributes: {
+                  "data-logic-action-id": action.id,
+                  "data-logic-action-field": "targetNodeId",
+                },
+                options: getPassTargetOptions(game),
+              })}
+            </div>
+          `
+          : ""
+      }
+    </div>
+  `;
+}
+
+function renderLogicVariableValueEditor(game, entry, ownerKind) {
+  const dataAttributes =
+    ownerKind === "trigger"
+      ? `data-logic-trigger-id="${escapeAttr(entry.id)}" data-logic-trigger-field="value"`
+      : `data-logic-action-id="${escapeAttr(entry.id)}" data-logic-action-field="value"`;
+  if (entry.variableType === "flag" || entry.variableType === "profile") {
+    return renderSelectControl({
+      menuId: `logic-${ownerKind}:${entry.id}:value`,
+      value: entry.value ?? "__NULL__",
+      attributes:
+        ownerKind === "trigger"
+          ? {
+              "data-logic-trigger-id": entry.id,
+              "data-logic-trigger-field": "value",
+            }
+          : {
+              "data-logic-action-id": entry.id,
+              "data-logic-action-field": "value",
+            },
+      options: getStatefulRequirementOptions(game, entry.variableType, entry.variableId),
+    });
+  }
+  if (entry.variableType === "string") {
+    return `<input class="field" ${dataAttributes} value="${escapeAttr(entry.value ?? "")}" />`;
+  }
+  return `<input class="field" type="number" ${dataAttributes} value="${escapeAttr(String(entry.value ?? 0))}" />`;
+}
+
+function getLogicVariableTriggerOperatorOptions(variableType) {
+  if (variableType === "tracker") {
+    return [
+      { value: "changed", label: "Any change" },
+      { value: "increase", label: "Increase" },
+      { value: "decrease", label: "Decrease" },
+      { value: "=", label: "Equal to" },
+      { value: "!=", label: "Not equal to" },
+      { value: "<", label: "Less than" },
+      { value: ">", label: "Greater than" },
+      { value: "<=", label: "Less than or equal to" },
+      { value: ">=", label: "Greater than or equal to" },
+    ];
+  }
+  return [
+    { value: "changed", label: "Any change" },
+    { value: "=", label: "Equal to" },
+    { value: "!=", label: "Not equal to" },
+  ];
 }
 
 function renderRuleTableHeader(kind) {
@@ -3253,6 +3675,33 @@ function getNodeOptions(game, chapterFilterId = null) {
     }));
 }
 
+function getPassTargetOptions(game) {
+  return [
+    ...game.nodes.map((node) => ({
+      value: node.id,
+      label: `Message: ${node.name || "Untitled message"}`,
+    })),
+    ...(game.logicNodes || []).map((logicNode) => ({
+      value: logicNode.id,
+      label: `Logic: ${logicNode.name || "Untitled logic node"}`,
+    })),
+  ];
+}
+
+function getPassTargetLabel(game, targetId) {
+  const target = getPassTargetById(game, targetId);
+  if (!target) {
+    return "";
+  }
+  return getNodeById(game, target.id)
+    ? target.name || "Untitled message"
+    : target.name || "Untitled logic node";
+}
+
+function isStoryNodeId(game, nodeId) {
+  return Boolean(getNodeById(game, nodeId));
+}
+
 function getFlagStateOptions(game, flagId) {
   const flag = getFlagById(game, flagId);
   const states = [null, ...(flag?.states ?? [])];
@@ -3284,14 +3733,18 @@ function renderGraph(game) {
   refs.graphZoomLabel.textContent = `${Math.round(appState.graph.zoom * 100)}%`;
   applyGraphTransform();
 
-  if (!game.nodes.length && !game.clusters.length) {
+  if (!game.nodes.length && !game.clusters.length && !game.logicNodes.length) {
     refs.graphNodes.innerHTML = `<div class="empty-graph">Add a message node to begin authoring.</div>`;
     refs.graphConnections.innerHTML = "";
     refs.graphOverlays.innerHTML = "";
     return;
   }
 
-  refs.graphNodes.innerHTML = [...game.clusters.map((cluster) => renderGraphCluster(game, cluster)), ...game.nodes.map((node) => renderGraphNode(game, node))]
+  refs.graphNodes.innerHTML = [
+    ...game.clusters.map((cluster) => renderGraphCluster(game, cluster)),
+    ...(game.logicNodes || []).map((logicNode) => renderGraphLogicNode(game, logicNode)),
+    ...game.nodes.map((node) => renderGraphNode(game, node)),
+  ]
     .join("");
 
   refs.graphConnections.innerHTML = buildConnectionPaths(game);
@@ -3300,7 +3753,7 @@ function renderGraph(game) {
 
 function renderGraphCluster(game, cluster) {
   const selectedCluster = appState.selection.clusterId === cluster.id;
-  const targetNode = cluster.targetNodeId ? getNodeById(game, cluster.targetNodeId) : null;
+  const targetNode = cluster.targetNodeId ? getPassTargetById(game, cluster.targetNodeId) : null;
 
   return `
     <article
@@ -3313,11 +3766,38 @@ function renderGraphCluster(game, cluster) {
       )}" data-connect-target-cluster-id="${escapeAttr(cluster.id)}" title="Connect into cluster"></button>
       <div class="cluster-shell" data-drag-cluster-id="${escapeAttr(cluster.id)}">
         <p class="cluster-label">${escapeHtml(cluster.name || "Cluster")}</p>
-        <p class="cluster-target">${escapeHtml(targetNode?.name || "No target message")}</p>
+        <p class="cluster-target">${escapeHtml(targetNode?.name || "No target node")}</p>
       </div>
       <button class="cluster-handle cluster-handle-out" type="button" data-connect-cluster-id="${escapeAttr(
         cluster.id
       )}" title="Connect cluster to message"></button>
+    </article>
+  `;
+}
+
+function renderGraphLogicNode(game, logicNode) {
+  const selectedLogicNode = appState.selection.logicNodeId === logicNode.id;
+  const targetNode = logicNode.targetNodeId ? getPassTargetById(game, logicNode.targetNodeId) : null;
+  const triggerCount = logicNode.triggers.length;
+  const actionCount = logicNode.actions.length;
+
+  return `
+    <article
+      class="graph-logic-node ${selectedLogicNode ? "selected" : ""}"
+      data-logic-node-id="${escapeAttr(logicNode.id)}"
+      style="transform: translate(${logicNode.position.x}px, ${logicNode.position.y}px);"
+    >
+      <button class="logic-node-handle logic-node-handle-in" type="button" data-node-inlet-id="${escapeAttr(
+        logicNode.id
+      )}" data-connect-target-node-id="${escapeAttr(logicNode.id)}" title="Connect into logic node"></button>
+      <div class="logic-node-shell" data-drag-logic-node-id="${escapeAttr(logicNode.id)}">
+        <p class="logic-node-label">${escapeHtml(logicNode.name || "Logic Node")}</p>
+        <p class="logic-node-meta">${triggerCount} trigger${triggerCount === 1 ? "" : "s"} · ${actionCount} action${actionCount === 1 ? "" : "s"}</p>
+        <p class="logic-node-target">${escapeHtml(targetNode?.name || "No continue target")}</p>
+      </div>
+      <button class="logic-node-handle logic-node-handle-out" type="button" data-connect-logic-node-id="${escapeAttr(
+        logicNode.id
+      )}" title="Connect logic node"></button>
     </article>
   `;
 }
@@ -3552,6 +4032,14 @@ function renderGraphFloatingPanels(game) {
     }
   }
 
+  if (appState.selection.logicNodeMenuId) {
+    const logicNode = getLogicNodeById(game, appState.selection.logicNodeMenuId);
+    const anchor = getFloatingPanelAnchor(`.graph-logic-node[data-logic-node-id="${appState.selection.logicNodeMenuId}"]`);
+    if (logicNode && anchor) {
+      parts.push(renderLogicNodeFloatingMenu(game, logicNode, anchor));
+    }
+  }
+
   return parts.join("");
 }
 
@@ -3581,6 +4069,16 @@ function renderOptionFloatingMenu(game, node, option, positionStyle) {
     <div class="floating-node-panel" style="${positionStyle}">
       <div class="floating-node-panel-shell">
         ${renderOptionInspector(game, node, option)}
+      </div>
+    </div>
+  `;
+}
+
+function renderLogicNodeFloatingMenu(game, logicNode, positionStyle) {
+  return `
+    <div class="floating-node-panel" style="${positionStyle}">
+      <div class="floating-node-panel-shell">
+        ${renderLogicNodeInspector(game, logicNode)}
       </div>
     </div>
   `;
@@ -3712,10 +4210,26 @@ function buildConnectionPaths(game) {
     paths.push(renderConnectionPath(start, end, "cluster-link"));
   });
 
-  if (appState.drag?.type === "connect" || appState.drag?.type === "connectCluster") {
+  (game.logicNodes || []).forEach((logicNode) => {
+    if (!logicNode.targetNodeId) {
+      return;
+    }
+
+    const start = getWorldPointForElement(`[data-connect-logic-node-id="${escapeAttr(logicNode.id)}"]`);
+    const end = getWorldPointForElement(`[data-node-inlet-id="${escapeAttr(logicNode.targetNodeId)}"]`);
+    if (!start || !end) {
+      return;
+    }
+
+    paths.push(renderConnectionPath(start, end, "cluster-link"));
+  });
+
+  if (appState.drag?.type === "connect" || appState.drag?.type === "connectCluster" || appState.drag?.type === "connectLogicNode") {
     const start = appState.drag.type === "connect"
       ? getWorldPointForElement(`[data-connect-option-id="${escapeAttr(appState.drag.optionId)}"]`)
-      : getWorldPointForElement(`[data-connect-cluster-id="${escapeAttr(appState.drag.clusterId)}"]`);
+      : appState.drag.type === "connectCluster"
+        ? getWorldPointForElement(`[data-connect-cluster-id="${escapeAttr(appState.drag.clusterId)}"]`)
+        : getWorldPointForElement(`[data-connect-logic-node-id="${escapeAttr(appState.drag.logicNodeId)}"]`);
     const end = clientPointToWorld(appState.drag.pointerX, appState.drag.pointerY);
     if (start && end) {
       paths.push(renderConnectionPath(start, end, "preview"));
@@ -3922,6 +4436,8 @@ function applyPlayOption(game, playState, currentNode, option) {
     return;
   }
 
+  const logicContext = createLogicExecutionContext(game, playState);
+
   playState.history.push({
     nodeId: currentNode.id,
     optionId: option.id,
@@ -3932,28 +4448,22 @@ function applyPlayOption(game, playState, currentNode, option) {
   });
 
   option.variableEffects.forEach((effect) => {
-    applyVariableEffect(game, playState, effect);
+    applyVariableEffect(game, playState, effect, new Set(), logicContext);
   });
 
-  const transition = resolveTransition(game, playState, currentNode, option);
+  if (playState.status !== "active") {
+    playState.updatedAt = new Date().toISOString();
+    return;
+  }
+
+  const forcedTargetId = consumeLogicJumpTarget(logicContext);
+  const transition = forcedTargetId
+    ? { type: "node", nodeId: forcedTargetId }
+    : resolveTransition(game, playState, currentNode, option);
   playState.updatedAt = new Date().toISOString();
 
   if (transition.type === "node") {
-    const nextNode = getNodeById(game, transition.nodeId);
-    if (!nextNode) {
-      playState.status = "error";
-      playState.log.push({
-        type: "event",
-        label: "Runtime error",
-        text: "The option target could not be resolved.",
-      });
-      return;
-    }
-
-    playState.currentNodeId = nextNode.id;
-    playState.currentChapterId = nextNode.chapterId;
-    appendMessageLog(playState, nextNode);
-    maybeCompleteOnEndpoint(playState, nextNode);
+    advancePlayStateToTarget(game, playState, transition.nodeId, logicContext);
     return;
   }
 
@@ -3985,10 +4495,7 @@ function applyPlayOption(game, playState, currentNode, option) {
       label: "Chapter complete",
       text: `Advancing to ${nextChapter.name}.`,
     });
-    playState.currentChapterId = nextChapter.id;
-    playState.currentNodeId = nextNode.id;
-    appendMessageLog(playState, nextNode);
-    maybeCompleteOnEndpoint(playState, nextNode);
+    advancePlayStateToTarget(game, playState, nextNode.id, logicContext);
     return;
   }
 
@@ -4027,6 +4534,58 @@ function appendMessageLog(playState, node) {
     secondary: interpolateText(appState.playGame, playState, buildNodeSecondaryLine(appState.playGame, node)),
     body: interpolateText(appState.playGame, playState, getNodeRuntimeBody(appState.playGame, playState, node)),
   });
+}
+
+function advancePlayStateToTarget(game, playState, initialTargetId, logicContext = createLogicExecutionContext(game, playState)) {
+  let targetId = initialTargetId;
+
+  while (targetId && playState.status === "active") {
+    if (!guardLogicExecution(logicContext)) {
+      return;
+    }
+
+    const target = getPassTargetById(game, targetId);
+    if (!target) {
+      playState.status = "error";
+      playState.log.push({
+        type: "event",
+        label: "Runtime error",
+        text: "The option target could not be resolved.",
+      });
+      return;
+    }
+
+    dispatchLogicNodePass(game, playState, logicContext, target);
+    if (playState.status !== "active") {
+      return;
+    }
+
+    const jumpTargetId = consumeLogicJumpTarget(logicContext);
+    if (jumpTargetId) {
+      targetId = jumpTargetId;
+      continue;
+    }
+
+    const nextNode = getNodeById(game, target.id);
+    if (nextNode) {
+      playState.currentNodeId = nextNode.id;
+      playState.currentChapterId = nextNode.chapterId;
+      appendMessageLog(playState, nextNode);
+      maybeCompleteOnEndpoint(playState, nextNode);
+      return;
+    }
+
+    targetId = target.targetNodeId || null;
+    if (!targetId) {
+      playState.status = "error";
+      playState.log.push({
+        type: "event",
+        label: "Runtime error",
+        text: "A logic node was passed without a continue target or jump action.",
+      });
+      return;
+    }
+  }
 }
 
 function maybeCompleteOnEndpoint(playState, node) {
@@ -4440,6 +4999,7 @@ function closeTransientCreateMenus() {
   const hadOpenMenu =
     appState.selection.trackerMenuId !== null ||
     appState.selection.nodeMenuId !== null ||
+    appState.selection.logicNodeMenuId !== null ||
     appState.selection.paragraphMenuId !== null ||
     appState.selection.optionMenuId !== null ||
     appState.selection.floatingActionMenuId !== null ||
@@ -4450,6 +5010,7 @@ function closeTransientCreateMenus() {
 
   appState.selection.trackerMenuId = null;
   appState.selection.nodeMenuId = null;
+  appState.selection.logicNodeMenuId = null;
   appState.selection.paragraphMenuId = null;
   appState.selection.optionMenuId = null;
   appState.selection.floatingActionMenuId = null;
@@ -4466,6 +5027,7 @@ function handleDocumentMouseDown(event) {
     appState.view === "create" &&
     !event.target.closest(
       "#graphViewport, .menu-wrap, .floating-node-panel, .graph-node, .graph-cluster, .create-panel, .graph-floating-controls, button, input, textarea, select, label"
+      + ", .graph-logic-node"
     )
   ) {
     const closedMenu = closeTransientCreateMenus();
@@ -4607,6 +5169,7 @@ function handleGraphClick(event) {
     switch (actionElement.dataset.action) {
       case "toggle-node-menu":
         appState.selection.nodeId = actionElement.dataset.nodeId;
+        appState.selection.logicNodeId = null;
         appState.selection.clusterId = null;
         appState.selection.paragraphId = null;
         appState.selection.optionId = null;
@@ -4616,17 +5179,20 @@ function handleGraphClick(event) {
         appState.selection.selectMenuId = null;
         appState.selection.nodeMenuId =
           appState.selection.nodeMenuId === actionElement.dataset.nodeId ? null : actionElement.dataset.nodeId;
+        appState.selection.logicNodeMenuId = null;
         appState.selection.floatingActionMenuId = null;
         renderCreateView();
         return;
       case "toggle-paragraph-menu": {
         const menuKey = buildParagraphMenuKey(actionElement.dataset.nodeId, actionElement.dataset.paragraphId);
         appState.selection.nodeId = actionElement.dataset.nodeId;
+        appState.selection.logicNodeId = null;
         appState.selection.clusterId = null;
         appState.selection.paragraphId = actionElement.dataset.paragraphId;
         appState.selection.optionId = null;
         appState.selection.trackerMenuId = null;
         appState.selection.nodeMenuId = null;
+        appState.selection.logicNodeMenuId = null;
         appState.selection.optionMenuId = null;
         appState.selection.selectMenuId = null;
         appState.selection.floatingActionMenuId = null;
@@ -4637,11 +5203,13 @@ function handleGraphClick(event) {
       case "toggle-option-menu": {
         const menuKey = buildOptionMenuKey(actionElement.dataset.nodeId, actionElement.dataset.optionId);
         appState.selection.nodeId = actionElement.dataset.nodeId;
+        appState.selection.logicNodeId = null;
         appState.selection.clusterId = null;
         appState.selection.paragraphId = null;
         appState.selection.optionId = actionElement.dataset.optionId;
         appState.selection.trackerMenuId = null;
         appState.selection.nodeMenuId = null;
+        appState.selection.logicNodeMenuId = null;
         appState.selection.paragraphMenuId = null;
         appState.selection.selectMenuId = null;
         appState.selection.floatingActionMenuId = null;
@@ -4651,6 +5219,7 @@ function handleGraphClick(event) {
       }
       case "edit-paragraph-settings":
         appState.selection.nodeId = actionElement.dataset.nodeId;
+        appState.selection.logicNodeId = null;
         appState.selection.clusterId = null;
         appState.selection.paragraphId = actionElement.dataset.paragraphId;
         appState.selection.optionId = null;
@@ -4662,6 +5231,7 @@ function handleGraphClick(event) {
         return;
       case "edit-option-settings":
         appState.selection.nodeId = actionElement.dataset.nodeId;
+        appState.selection.logicNodeId = null;
         appState.selection.clusterId = null;
         appState.selection.paragraphId = null;
         appState.selection.optionId = actionElement.dataset.optionId;
@@ -4682,6 +5252,7 @@ function handleGraphClick(event) {
         const option = createOption();
         node.options.push(option);
         appState.selection.nodeId = node.id;
+        appState.selection.logicNodeId = null;
         appState.selection.clusterId = null;
         appState.selection.paragraphId = null;
         appState.selection.optionId = option.id;
@@ -4749,6 +5320,7 @@ function handleGraphClick(event) {
         return;
       case "delete-node-inline":
         appState.selection.nodeId = actionElement.dataset.nodeId;
+        appState.selection.logicNodeId = null;
         appState.selection.clusterId = null;
         appState.selection.paragraphId = null;
         appState.selection.optionId = null;
@@ -4770,11 +5342,13 @@ function handleGraphClick(event) {
   const optionElement = event.target.closest("[data-option-id]");
   if (optionElement) {
     appState.selection.nodeId = optionElement.dataset.nodeId;
+    appState.selection.logicNodeId = null;
     appState.selection.clusterId = null;
     appState.selection.paragraphId = null;
     appState.selection.optionId = optionElement.dataset.optionId;
     appState.selection.trackerMenuId = null;
     appState.selection.nodeMenuId = null;
+    appState.selection.logicNodeMenuId = null;
     appState.selection.paragraphMenuId = null;
     appState.selection.optionMenuId = buildOptionMenuKey(optionElement.dataset.nodeId, optionElement.dataset.optionId);
     appState.selection.floatingActionMenuId = null;
@@ -4786,11 +5360,13 @@ function handleGraphClick(event) {
   const paragraphElement = event.target.closest("[data-paragraph-id]");
   if (paragraphElement) {
     appState.selection.nodeId = paragraphElement.dataset.nodeId;
+    appState.selection.logicNodeId = null;
     appState.selection.clusterId = null;
     appState.selection.paragraphId = paragraphElement.dataset.paragraphId;
     appState.selection.optionId = null;
     appState.selection.trackerMenuId = null;
     appState.selection.nodeMenuId = null;
+    appState.selection.logicNodeMenuId = null;
     appState.selection.paragraphMenuId = buildParagraphMenuKey(
       paragraphElement.dataset.nodeId,
       paragraphElement.dataset.paragraphId
@@ -4802,14 +5378,34 @@ function handleGraphClick(event) {
     return;
   }
 
+  const logicNodeElement = event.target.closest("[data-logic-node-id]");
+  if (logicNodeElement) {
+    appState.selection.nodeId = null;
+    appState.selection.logicNodeId = logicNodeElement.dataset.logicNodeId;
+    appState.selection.clusterId = null;
+    appState.selection.paragraphId = null;
+    appState.selection.optionId = null;
+    appState.selection.trackerMenuId = null;
+    appState.selection.nodeMenuId = null;
+    appState.selection.logicNodeMenuId = logicNodeElement.dataset.logicNodeId;
+    appState.selection.paragraphMenuId = null;
+    appState.selection.optionMenuId = null;
+    appState.selection.floatingActionMenuId = null;
+    appState.selection.selectMenuId = null;
+    renderCreateView();
+    return;
+  }
+
   const clusterElement = event.target.closest("[data-cluster-id]");
   if (clusterElement) {
     appState.selection.nodeId = null;
+    appState.selection.logicNodeId = null;
     appState.selection.clusterId = clusterElement.dataset.clusterId;
     appState.selection.paragraphId = null;
     appState.selection.optionId = null;
     appState.selection.trackerMenuId = null;
     appState.selection.nodeMenuId = null;
+    appState.selection.logicNodeMenuId = null;
     appState.selection.paragraphMenuId = null;
     appState.selection.optionMenuId = null;
     appState.selection.floatingActionMenuId = null;
@@ -4821,11 +5417,13 @@ function handleGraphClick(event) {
   const nodeElement = event.target.closest("[data-node-id]");
   if (nodeElement) {
     appState.selection.nodeId = nodeElement.dataset.nodeId;
+    appState.selection.logicNodeId = null;
     appState.selection.clusterId = null;
     appState.selection.paragraphId = null;
     appState.selection.optionId = null;
     appState.selection.trackerMenuId = null;
     appState.selection.nodeMenuId = null;
+    appState.selection.logicNodeMenuId = null;
     appState.selection.paragraphMenuId = null;
     appState.selection.optionMenuId = null;
     appState.selection.floatingActionMenuId = null;
@@ -4840,21 +5438,25 @@ function handleGraphClick(event) {
 function clearEditorSelection() {
   const hadSelection =
     appState.selection.nodeId !== null ||
+    appState.selection.logicNodeId !== null ||
     appState.selection.clusterId !== null ||
     appState.selection.paragraphId !== null ||
     appState.selection.optionId !== null ||
     appState.selection.trackerMenuId !== null ||
     appState.selection.nodeMenuId !== null ||
+    appState.selection.logicNodeMenuId !== null ||
     appState.selection.paragraphMenuId !== null ||
     appState.selection.optionMenuId !== null ||
     appState.selection.floatingActionMenuId !== null ||
     appState.selection.selectMenuId !== null;
   appState.selection.nodeId = null;
+  appState.selection.logicNodeId = null;
   appState.selection.clusterId = null;
   appState.selection.paragraphId = null;
   appState.selection.optionId = null;
   appState.selection.trackerMenuId = null;
   appState.selection.nodeMenuId = null;
+  appState.selection.logicNodeMenuId = null;
   appState.selection.paragraphMenuId = null;
   appState.selection.optionMenuId = null;
   appState.selection.floatingActionMenuId = null;
@@ -4877,9 +5479,11 @@ function handleGraphFocusIn(event) {
   const optionElement = event.target.closest("[data-option-id]");
   if (optionElement) {
     appState.selection.nodeId = optionElement.dataset.nodeId;
+    appState.selection.logicNodeId = null;
     appState.selection.clusterId = null;
     appState.selection.paragraphId = null;
     appState.selection.optionId = optionElement.dataset.optionId;
+    appState.selection.logicNodeMenuId = null;
     appState.selection.paragraphMenuId = null;
     appState.selection.optionMenuId = buildOptionMenuKey(optionElement.dataset.nodeId, optionElement.dataset.optionId);
     appState.selection.floatingActionMenuId = null;
@@ -4889,9 +5493,11 @@ function handleGraphFocusIn(event) {
 
   if (paragraphElement) {
     appState.selection.nodeId = paragraphElement.dataset.nodeId;
+    appState.selection.logicNodeId = null;
     appState.selection.clusterId = null;
     appState.selection.paragraphId = paragraphElement.dataset.paragraphId;
     appState.selection.optionId = null;
+    appState.selection.logicNodeMenuId = null;
     appState.selection.paragraphMenuId = buildParagraphMenuKey(
       paragraphElement.dataset.nodeId,
       paragraphElement.dataset.paragraphId
@@ -4902,18 +5508,48 @@ function handleGraphFocusIn(event) {
     return;
   }
 
+  const logicNodeElement = event.target.closest("[data-logic-node-id]");
+  if (logicNodeElement) {
+    appState.selection.nodeId = null;
+    appState.selection.logicNodeId = logicNodeElement.dataset.logicNodeId;
+    appState.selection.clusterId = null;
+    appState.selection.paragraphId = null;
+    appState.selection.optionId = null;
+    appState.selection.logicNodeMenuId = logicNodeElement.dataset.logicNodeId;
+    appState.selection.paragraphMenuId = null;
+    appState.selection.optionMenuId = null;
+    appState.selection.floatingActionMenuId = null;
+    renderCreateView();
+    return;
+  }
+
   const clusterElement = event.target.closest("[data-cluster-id]");
   if (clusterElement) {
     appState.selection.nodeId = null;
+    appState.selection.logicNodeId = null;
     appState.selection.clusterId = clusterElement.dataset.clusterId;
     appState.selection.paragraphId = null;
     appState.selection.optionId = null;
+    appState.selection.logicNodeMenuId = null;
     renderInspector(appState.createGame);
   }
 }
 
 function handleNodeDragStart(event) {
   if (!appState.createGame) {
+    return;
+  }
+
+  const logicNodeHandle = event.target.closest("[data-connect-logic-node-id]");
+  if (logicNodeHandle) {
+    appState.drag = {
+      type: "connectLogicNode",
+      logicNodeId: logicNodeHandle.dataset.connectLogicNodeId,
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+    };
+    refs.graphConnections.innerHTML = buildConnectionPaths(appState.createGame);
+    event.preventDefault();
     return;
   }
 
@@ -4933,6 +5569,7 @@ function handleNodeDragStart(event) {
   const optionHandle = event.target.closest("[data-connect-option-id]");
   if (optionHandle) {
     appState.selection.nodeId = optionHandle.dataset.nodeId;
+    appState.selection.logicNodeId = null;
     appState.selection.clusterId = null;
     appState.selection.paragraphId = null;
     appState.selection.optionId = optionHandle.dataset.connectOptionId;
@@ -4978,6 +5615,30 @@ function handleNodeDragStart(event) {
     return;
   }
 
+  const logicNodeDragHandle = event.target.closest("[data-drag-logic-node-id]");
+  if (logicNodeDragHandle && !event.target.closest("button, input, textarea, select")) {
+    const logicNode = getLogicNodeById(appState.createGame, logicNodeDragHandle.dataset.dragLogicNodeId);
+    if (!logicNode) {
+      return;
+    }
+
+    appState.selection.nodeId = null;
+    appState.selection.logicNodeId = logicNode.id;
+    appState.selection.clusterId = null;
+    appState.selection.optionId = null;
+    appState.selection.paragraphId = null;
+    appState.drag = {
+      type: "logicNode",
+      logicNodeId: logicNode.id,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: logicNode.position.x,
+      originY: logicNode.position.y,
+    };
+    event.preventDefault();
+    return;
+  }
+
   const clusterDragHandle = event.target.closest("[data-drag-cluster-id]");
   if (clusterDragHandle && !event.target.closest("button, input, textarea, select")) {
     const cluster = getClusterById(appState.createGame, clusterDragHandle.dataset.dragClusterId);
@@ -4986,6 +5647,7 @@ function handleNodeDragStart(event) {
     }
 
     appState.selection.nodeId = null;
+    appState.selection.logicNodeId = null;
     appState.selection.clusterId = cluster.id;
     appState.selection.optionId = null;
     appState.selection.paragraphId = null;
@@ -5012,6 +5674,7 @@ function handleNodeDragStart(event) {
   }
 
   appState.selection.nodeId = node.id;
+  appState.selection.logicNodeId = null;
   appState.selection.clusterId = null;
   appState.selection.optionId = null;
   appState.drag = {
@@ -5030,7 +5693,7 @@ function handleViewportPanStart(event) {
     return;
   }
 
-  if (event.target.closest(".graph-node, .graph-cluster, .floating-node-panel, .create-panel, .graph-floating-controls")) {
+  if (event.target.closest(".graph-node, .graph-cluster, .graph-logic-node, .floating-node-panel, .create-panel, .graph-floating-controls")) {
     return;
   }
 
@@ -5131,12 +5794,32 @@ function handleDocumentDrag(event) {
     return;
   }
 
+  if (appState.drag.type === "logicNode") {
+    const logicNode = getLogicNodeById(appState.createGame, appState.drag.logicNodeId);
+    if (!logicNode) {
+      return;
+    }
+
+    logicNode.position.x = clamp(
+      Math.round(appState.drag.originX + (event.clientX - appState.drag.startX) / appState.graph.zoom),
+      0,
+      GRAPH_WORLD_WIDTH - 220
+    );
+    logicNode.position.y = clamp(
+      Math.round(appState.drag.originY + (event.clientY - appState.drag.startY) / appState.graph.zoom),
+      0,
+      GRAPH_WORLD_HEIGHT - 140
+    );
+    renderGraph(appState.createGame);
+    return;
+  }
+
   if (appState.drag.type === "reorderParagraph" || appState.drag.type === "reorderOption") {
     updateReorderDrag(event);
     return;
   }
 
-  if (appState.drag.type === "connect" || appState.drag.type === "connectCluster") {
+  if (appState.drag.type === "connect" || appState.drag.type === "connectCluster" || appState.drag.type === "connectLogicNode") {
     appState.drag.pointerX = event.clientX;
     appState.drag.pointerY = event.clientY;
     refs.graphConnections.innerHTML = buildConnectionPaths(appState.createGame);
@@ -5149,12 +5832,14 @@ function handleDocumentDragEnd(event) {
   }
 
   if (appState.drag.type === "pan") {
-    if (!appState.drag.moved && !appState.drag.startTarget?.closest(".graph-node, .graph-cluster, .create-panel, .graph-floating-controls")) {
+    if (!appState.drag.moved && !appState.drag.startTarget?.closest(".graph-node, .graph-cluster, .graph-logic-node, .create-panel, .graph-floating-controls")) {
       clearEditorSelection();
     } else if (appState.drag.moved) {
       appState.graph.suppressNextGraphClick = true;
     }
   } else if (appState.drag.type === "node") {
+    persistEditorDraft();
+  } else if (appState.drag.type === "logicNode") {
     persistEditorDraft();
   } else if (appState.drag.type === "cluster") {
     persistEditorDraft();
@@ -5163,7 +5848,7 @@ function handleDocumentDragEnd(event) {
       persistEditorDraft();
       appState.graph.suppressNextGraphClick = true;
     }
-  } else if ((appState.drag.type === "connect" || appState.drag.type === "connectCluster") && appState.createGame) {
+  } else if ((appState.drag.type === "connect" || appState.drag.type === "connectCluster" || appState.drag.type === "connectLogicNode") && appState.createGame) {
     const targetElement = event.target.closest("[data-connect-target-node-id]");
     const clusterTargetElement = event.target.closest("[data-connect-target-cluster-id]");
     if (appState.drag.type === "connect") {
@@ -5174,6 +5859,7 @@ function handleDocumentDragEnd(event) {
         option.targetClusterId = null;
         option.targetNodeId = targetElement.dataset.connectTargetNodeId;
         appState.selection.nodeId = appState.drag.nodeId;
+        appState.selection.logicNodeId = null;
         appState.selection.clusterId = null;
         appState.selection.paragraphId = null;
         appState.selection.optionId = appState.drag.optionId;
@@ -5188,6 +5874,7 @@ function handleDocumentDragEnd(event) {
         option.targetClusterId = clusterTargetElement.dataset.connectTargetClusterId;
         option.targetNodeId = null;
         appState.selection.nodeId = appState.drag.nodeId;
+        appState.selection.logicNodeId = null;
         appState.selection.clusterId = null;
         appState.selection.paragraphId = null;
         appState.selection.optionId = appState.drag.optionId;
@@ -5203,14 +5890,30 @@ function handleDocumentDragEnd(event) {
         refs.graphViewport.classList.remove("dragging");
         return;
       }
-    } else {
+    } else if (appState.drag.type === "connectCluster") {
       const cluster = getClusterById(appState.createGame, appState.drag.clusterId);
       if (cluster && targetElement) {
         cluster.targetNodeId = targetElement.dataset.connectTargetNodeId;
         appState.selection.nodeId = null;
+        appState.selection.logicNodeId = null;
         appState.selection.clusterId = cluster.id;
         appState.selection.paragraphId = null;
         appState.selection.optionId = null;
+        commitEditorChange();
+        appState.drag = null;
+        refs.graphViewport.classList.remove("dragging");
+        return;
+      }
+    } else {
+      const logicNode = getLogicNodeById(appState.createGame, appState.drag.logicNodeId);
+      if (logicNode && targetElement) {
+        logicNode.targetNodeId = targetElement.dataset.connectTargetNodeId;
+        appState.selection.nodeId = null;
+        appState.selection.logicNodeId = logicNode.id;
+        appState.selection.clusterId = null;
+        appState.selection.paragraphId = null;
+        appState.selection.optionId = null;
+        appState.selection.logicNodeMenuId = logicNode.id;
         commitEditorChange();
         appState.drag = null;
         refs.graphViewport.classList.remove("dragging");
@@ -5295,7 +5998,7 @@ function updateReorderDrag(event) {
 function shouldCreateNodeFromConnectDrop(target) {
   return Boolean(
     target.closest("#graphViewport") &&
-      !target.closest(".floating-node-panel, .create-panel, .graph-floating-controls, .graph-node, .graph-cluster")
+      !target.closest(".floating-node-panel, .create-panel, .graph-floating-controls, .graph-node, .graph-cluster, .graph-logic-node")
   );
 }
 
@@ -5313,6 +6016,7 @@ function createConnectedNodeAtPoint(sourceNode, option, point) {
   option.targetClusterId = null;
   option.targetNodeId = node.id;
   appState.selection.nodeId = node.id;
+  appState.selection.logicNodeId = null;
   appState.selection.clusterId = null;
   appState.selection.paragraphId = null;
   appState.selection.optionId = null;
@@ -5352,6 +6056,11 @@ function handleInspectorClick(event) {
       appState.selection.clusterId = null;
       renderCreateView();
       break;
+    case "clear-logic-node-selection":
+      appState.selection.logicNodeId = null;
+      appState.selection.logicNodeMenuId = null;
+      renderCreateView();
+      break;
     case "add-option":
       withSelectedNode((node) => {
         const option = createOption();
@@ -5387,6 +6096,12 @@ function handleInspectorClick(event) {
       break;
     case "delete-cluster":
       deleteSelectedCluster();
+      break;
+    case "duplicate-logic-node":
+      duplicateLogicNode(appState.selection.logicNodeId);
+      break;
+    case "delete-logic-node":
+      deleteSelectedLogicNode();
       break;
     case "move-option-up":
       moveOption(appState.selection.nodeId, appState.selection.optionId, -1);
@@ -5471,6 +6186,32 @@ function handleInspectorClick(event) {
       });
       commitEditorChange();
       break;
+    case "add-logic-trigger":
+      withSelectedLogicNode((logicNode) => {
+        logicNode.triggers.push(createLogicTrigger("passSelf"));
+      });
+      commitEditorChange();
+      break;
+    case "remove-logic-trigger":
+      withSelectedLogicNode((logicNode) => {
+        logicNode.triggers = logicNode.triggers.filter((trigger) => trigger.id !== actionElement.dataset.logicTriggerId);
+      });
+      commitEditorChange();
+      break;
+    case "add-logic-action":
+      withSelectedLogicNode((logicNode, game) => {
+        const action = createLogicAction("emitEvent");
+        action.variableId = game.trackers[0]?.id ?? null;
+        logicNode.actions.push(action);
+      });
+      commitEditorChange();
+      break;
+    case "remove-logic-action":
+      withSelectedLogicNode((logicNode) => {
+        logicNode.actions = logicNode.actions.filter((entry) => entry.id !== actionElement.dataset.logicActionId);
+      });
+      commitEditorChange();
+      break;
     default:
       break;
   }
@@ -5499,6 +6240,15 @@ function handleInspectorChange(event) {
     }
 
     cluster[target.dataset.clusterField] = target.value || null;
+    commitEditorChange();
+    return;
+  }
+
+  if (target.dataset.logicNodeField) {
+    withSelectedLogicNode((logicNode) => {
+      logicNode[target.dataset.logicNodeField] =
+        target.dataset.logicNodeField === "targetNodeId" ? target.value || null : target.value;
+    });
     commitEditorChange();
     return;
   }
@@ -5573,6 +6323,70 @@ function handleInspectorChange(event) {
               : target.value;
       } else {
         effect[field] = target.value || null;
+      }
+    });
+    commitEditorChange();
+    return;
+  }
+
+  if (target.dataset.logicTriggerId) {
+    withSelectedLogicNode((logicNode, game) => {
+      const trigger = logicNode.triggers.find((entry) => entry.id === target.dataset.logicTriggerId);
+      if (!trigger) {
+        return;
+      }
+
+      const field = target.dataset.logicTriggerField;
+      if (field === "kind") {
+        const replacement = createLogicTrigger(target.value, trigger.id);
+        replacement.variableId = getFirstVariableId(game, replacement.variableType);
+        Object.assign(trigger, replacement);
+      } else if (field === "variableType") {
+        trigger.variableType = target.value;
+        trigger.variableId = getFirstVariableId(game, target.value);
+        trigger.value = target.value === "tracker" ? 0 : target.value === "string" ? "" : null;
+        trigger.operator = "changed";
+      } else if (field === "value") {
+        trigger.value =
+          trigger.variableType === "tracker"
+            ? parseNumberOrFallback(target.value, 0)
+            : trigger.variableType === "flag" || trigger.variableType === "profile"
+              ? fromNullableSelectValue(target.value)
+              : target.value;
+      } else {
+        trigger[field] = field === "eventName" ? target.value : target.value || null;
+      }
+    });
+    commitEditorChange();
+    return;
+  }
+
+  if (target.dataset.logicActionId) {
+    withSelectedLogicNode((logicNode, game) => {
+      const action = logicNode.actions.find((entry) => entry.id === target.dataset.logicActionId);
+      if (!action) {
+        return;
+      }
+
+      const field = target.dataset.logicActionField;
+      if (field === "kind") {
+        const replacement = createLogicAction(target.value, action.id);
+        replacement.variableId = getFirstVariableId(game, replacement.variableType);
+        Object.assign(action, replacement);
+      } else if (field === "variableType") {
+        action.variableType = target.value;
+        action.variableId = getFirstVariableId(game, target.value);
+        action.value = target.value === "tracker" ? 0 : target.value === "string" ? "" : null;
+        action.action = "set";
+      } else if (field === "value") {
+        action.value =
+          action.variableType === "tracker"
+            ? parseNumberOrFallback(target.value, 0)
+            : action.variableType === "flag" || action.variableType === "profile"
+              ? fromNullableSelectValue(target.value)
+              : target.value;
+      } else {
+        action[field] = field === "eventName" ? target.value : target.value || null;
       }
     });
     commitEditorChange();
@@ -5725,6 +6539,7 @@ function addNodeAtViewportCenter() {
     chapter.startNodeId = node.id;
   }
   appState.selection.nodeId = node.id;
+  appState.selection.logicNodeId = null;
   appState.selection.paragraphId = null;
   appState.selection.optionId = null;
   commitEditorChange();
@@ -5746,6 +6561,27 @@ function addClusterAtViewportCenter() {
   appState.selection.clusterId = cluster.id;
   appState.selection.paragraphId = null;
   appState.selection.optionId = null;
+  commitEditorChange();
+}
+
+function addLogicNodeAtViewportCenter() {
+  if (!appState.createGame) {
+    return;
+  }
+
+  const frame = getCanvasFocusFrame();
+  const worldX = (frame.originX + frame.width / 2 - appState.graph.panX) / appState.graph.zoom;
+  const worldY = (frame.originY + frame.height / 2 - appState.graph.panY) / appState.graph.zoom;
+  const logicNode = createLogicNode(`Logic ${appState.createGame.logicNodes.length + 1}`);
+  logicNode.position.x = clamp(Math.round(worldX - 84), 0, GRAPH_WORLD_WIDTH - 220);
+  logicNode.position.y = clamp(Math.round(worldY - 40), 0, GRAPH_WORLD_HEIGHT - 140);
+  appState.createGame.logicNodes.push(logicNode);
+  appState.selection.nodeId = null;
+  appState.selection.logicNodeId = logicNode.id;
+  appState.selection.clusterId = null;
+  appState.selection.paragraphId = null;
+  appState.selection.optionId = null;
+  appState.selection.logicNodeMenuId = logicNode.id;
   commitEditorChange();
 }
 
@@ -5771,11 +6607,39 @@ function duplicateNode(nodeId) {
 
   appState.createGame.nodes.push(duplicate);
   appState.selection.nodeId = duplicate.id;
+  appState.selection.logicNodeId = null;
   appState.selection.paragraphId = null;
   appState.selection.optionId = null;
   appState.selection.nodeMenuId = null;
   appState.selection.paragraphMenuId = null;
   appState.selection.optionMenuId = null;
+  commitEditorChange();
+}
+
+function duplicateLogicNode(logicNodeId) {
+  if (!appState.createGame) {
+    return;
+  }
+
+  const source = getLogicNodeById(appState.createGame, logicNodeId);
+  if (!source) {
+    return;
+  }
+
+  const duplicate = createLogicNode(source.name ? `${source.name} Copy` : "Logic Node Copy");
+  duplicate.targetNodeId = source.targetNodeId;
+  duplicate.position.x = clamp(source.position.x + 44, 0, GRAPH_WORLD_WIDTH - 220);
+  duplicate.position.y = clamp(source.position.y + 44, 0, GRAPH_WORLD_HEIGHT - 140);
+  duplicate.triggers = source.triggers.map((trigger) => ({ ...clone(trigger), id: createId("logic-trigger") }));
+  duplicate.actions = source.actions.map((action) => ({ ...clone(action), id: createId("logic-action") }));
+
+  appState.createGame.logicNodes.push(duplicate);
+  appState.selection.nodeId = null;
+  appState.selection.logicNodeId = duplicate.id;
+  appState.selection.clusterId = null;
+  appState.selection.paragraphId = null;
+  appState.selection.optionId = null;
+  appState.selection.logicNodeMenuId = duplicate.id;
   commitEditorChange();
 }
 
@@ -5788,6 +6652,7 @@ function addParagraph(nodeId) {
   const paragraph = createParagraph("New paragraph");
   node.paragraphs.push(paragraph);
   appState.selection.nodeId = node.id;
+  appState.selection.logicNodeId = null;
   appState.selection.paragraphId = paragraph.id;
   appState.selection.optionId = null;
   appState.selection.paragraphMenuId = buildParagraphMenuKey(node.id, paragraph.id);
@@ -5806,6 +6671,7 @@ function duplicateParagraph(nodeId, paragraphId) {
   const index = node.paragraphs.findIndex((entry) => entry.id === paragraphId);
   node.paragraphs.splice(index + 1, 0, duplicate);
   appState.selection.nodeId = node.id;
+  appState.selection.logicNodeId = null;
   appState.selection.paragraphId = duplicate.id;
   appState.selection.optionId = null;
   appState.selection.paragraphMenuId = buildParagraphMenuKey(node.id, duplicate.id);
@@ -5836,6 +6702,7 @@ function moveParagraph(nodeId, paragraphId, direction) {
   }
 
   appState.selection.nodeId = node.id;
+  appState.selection.logicNodeId = null;
   appState.selection.paragraphId = paragraphId;
   appState.selection.optionId = null;
   appState.selection.paragraphMenuId = buildParagraphMenuKey(node.id, paragraphId);
@@ -5851,6 +6718,7 @@ function deleteParagraph(nodeId, paragraphId) {
 
   node.paragraphs = node.paragraphs.filter((paragraph) => paragraph.id !== paragraphId);
   appState.selection.nodeId = node.id;
+  appState.selection.logicNodeId = null;
   appState.selection.paragraphId = node.paragraphs[0]?.id || null;
   appState.selection.optionId = null;
   appState.selection.paragraphMenuId = null;
@@ -5870,6 +6738,7 @@ function duplicateNodeOption(nodeId, optionId) {
   const index = node.options.findIndex((entry) => entry.id === optionId);
   node.options.splice(index + 1, 0, duplicate);
   appState.selection.nodeId = node.id;
+  appState.selection.logicNodeId = null;
   appState.selection.paragraphId = null;
   appState.selection.optionId = duplicate.id;
   appState.selection.optionMenuId = buildOptionMenuKey(node.id, duplicate.id);
@@ -5889,6 +6758,7 @@ function moveOption(nodeId, optionId, direction) {
   }
 
   appState.selection.nodeId = node.id;
+  appState.selection.logicNodeId = null;
   appState.selection.paragraphId = null;
   appState.selection.optionId = optionId;
   appState.selection.optionMenuId = buildOptionMenuKey(node.id, optionId);
@@ -5911,6 +6781,21 @@ function deleteSelectedNode() {
       cluster.targetNodeId = null;
     }
   });
+  appState.createGame.logicNodes.forEach((logicNode) => {
+    if (logicNode.targetNodeId === nodeId) {
+      logicNode.targetNodeId = null;
+    }
+    logicNode.triggers.forEach((trigger) => {
+      if (trigger.targetNodeId === nodeId) {
+        trigger.targetNodeId = null;
+      }
+    });
+    logicNode.actions.forEach((action) => {
+      if (action.targetNodeId === nodeId) {
+        action.targetNodeId = null;
+      }
+    });
+  });
   appState.createGame.nodes.forEach((node) => {
     node.options.forEach((option) => {
       if (option.targetNodeId === nodeId) {
@@ -5926,6 +6811,7 @@ function deleteSelectedNode() {
     }
   });
   appState.selection.nodeId = fallbackNode.id;
+  appState.selection.logicNodeId = null;
   appState.selection.clusterId = null;
   appState.selection.paragraphId = null;
   appState.selection.optionId = null;
@@ -5953,8 +6839,47 @@ function deleteSelectedCluster() {
   commitEditorChange();
 }
 
+function deleteSelectedLogicNode() {
+  if (!appState.createGame || !appState.selection.logicNodeId) {
+    return;
+  }
+
+  const logicNodeId = appState.selection.logicNodeId;
+  appState.createGame.logicNodes = appState.createGame.logicNodes.filter((logicNode) => logicNode.id !== logicNodeId);
+  appState.createGame.clusters.forEach((cluster) => {
+    if (cluster.targetNodeId === logicNodeId) {
+      cluster.targetNodeId = null;
+    }
+  });
+  appState.createGame.nodes.forEach((node) => {
+    node.options.forEach((option) => {
+      if (option.targetNodeId === logicNodeId) {
+        option.targetNodeId = null;
+      }
+    });
+  });
+  appState.createGame.logicNodes.forEach((logicNode) => {
+    if (logicNode.targetNodeId === logicNodeId) {
+      logicNode.targetNodeId = null;
+    }
+    logicNode.triggers.forEach((trigger) => {
+      if (trigger.targetNodeId === logicNodeId) {
+        trigger.targetNodeId = null;
+      }
+    });
+    logicNode.actions.forEach((action) => {
+      if (action.targetNodeId === logicNodeId) {
+        action.targetNodeId = null;
+      }
+    });
+  });
+  appState.selection.logicNodeId = null;
+  appState.selection.logicNodeMenuId = null;
+  commitEditorChange();
+}
+
 function centerGraph() {
-  if (!appState.createGame || (!appState.createGame.nodes.length && !appState.createGame.clusters.length)) {
+  if (!appState.createGame || (!appState.createGame.nodes.length && !appState.createGame.clusters.length && !appState.createGame.logicNodes.length)) {
     appState.graph.panX = 140;
     appState.graph.panY = 110;
     appState.graph.zoom = 1;
@@ -5962,7 +6887,7 @@ function centerGraph() {
     return;
   }
 
-  const bounds = getGraphBounds([...appState.createGame.nodes, ...appState.createGame.clusters]);
+  const bounds = getGraphBounds([...appState.createGame.nodes, ...appState.createGame.clusters, ...appState.createGame.logicNodes]);
   const frame = getCanvasFocusFrame();
   const availableWidth = frame.width || 900;
   const availableHeight = frame.height || 600;
@@ -6069,6 +6994,17 @@ function withSelectedOption(mutator) {
   });
 }
 
+function withSelectedLogicNode(mutator) {
+  if (!appState.createGame || !appState.selection.logicNodeId) {
+    return;
+  }
+
+  const logicNode = getLogicNodeById(appState.createGame, appState.selection.logicNodeId);
+  if (logicNode) {
+    mutator(logicNode, appState.createGame);
+  }
+}
+
 function withSelectedParagraph(mutator) {
   withSelectedNode((node, game) => {
     const paragraph = getParagraphById(node, appState.selection.paragraphId);
@@ -6087,10 +7023,12 @@ function commitEditorChange() {
 function normalizeEditorSelection() {
   if (!appState.createGame) {
     appState.selection.nodeId = null;
+    appState.selection.logicNodeId = null;
     appState.selection.clusterId = null;
     appState.selection.paragraphId = null;
     appState.selection.optionId = null;
     appState.selection.nodeMenuId = null;
+    appState.selection.logicNodeMenuId = null;
     appState.selection.paragraphMenuId = null;
     appState.selection.optionMenuId = null;
     appState.selection.floatingActionMenuId = null;
@@ -6099,7 +7037,8 @@ function normalizeEditorSelection() {
   }
 
   if (!getNodeById(appState.createGame, appState.selection.nodeId)) {
-    appState.selection.nodeId = appState.selection.clusterId ? null : getGameStartNodeId(appState.createGame);
+    appState.selection.nodeId =
+      appState.selection.clusterId || appState.selection.logicNodeId ? null : getGameStartNodeId(appState.createGame);
     appState.selection.paragraphId = null;
     appState.selection.optionId = null;
     appState.selection.nodeMenuId = null;
@@ -6107,6 +7046,11 @@ function normalizeEditorSelection() {
     appState.selection.optionMenuId = null;
     appState.selection.floatingActionMenuId = null;
     appState.selection.selectMenuId = null;
+  }
+
+  if (appState.selection.logicNodeId && !getLogicNodeById(appState.createGame, appState.selection.logicNodeId)) {
+    appState.selection.logicNodeId = null;
+    appState.selection.logicNodeMenuId = null;
   }
 
   if (appState.selection.clusterId && !getClusterById(appState.createGame, appState.selection.clusterId)) {
@@ -6122,6 +7066,9 @@ function normalizeEditorSelection() {
   }
   if (appState.selection.nodeMenuId && !getNodeById(appState.createGame, appState.selection.nodeMenuId)) {
     appState.selection.nodeMenuId = null;
+  }
+  if (appState.selection.logicNodeMenuId && !getLogicNodeById(appState.createGame, appState.selection.logicNodeMenuId)) {
+    appState.selection.logicNodeMenuId = null;
   }
   if (appState.selection.paragraphMenuId) {
     const [nodeId, paragraphId] = appState.selection.paragraphMenuId.split(":");
@@ -6183,6 +7130,7 @@ function createGameScaffold() {
     profiles: [],
     strings: [],
     clusters: [],
+    logicNodes: [],
     nodes: [openingNode],
   };
 }
@@ -6221,6 +7169,20 @@ function createCluster(name = "Cluster") {
       x: 240,
       y: 200,
     },
+  };
+}
+
+function createLogicNode(name = "Logic Node") {
+  return {
+    id: createId("logic"),
+    name,
+    targetNodeId: null,
+    position: {
+      x: 300,
+      y: 240,
+    },
+    triggers: [],
+    actions: [],
   };
 }
 
@@ -6345,6 +7307,32 @@ function createVariableEffect(variableType = "tracker", variableId = null, id = 
     variableType,
     variableId,
     value: variableType === "flag" || variableType === "profile" ? null : variableType === "string" ? "" : 0,
+  };
+}
+
+function createLogicTrigger(kind = "passSelf", id = createId("logic-trigger")) {
+  return {
+    id,
+    kind,
+    targetNodeId: null,
+    variableType: "tracker",
+    variableId: null,
+    operator: "changed",
+    value: 0,
+    eventName: "",
+  };
+}
+
+function createLogicAction(kind = "emitEvent", id = createId("logic-action")) {
+  return {
+    id,
+    kind,
+    eventName: "",
+    action: "set",
+    variableType: "tracker",
+    variableId: null,
+    value: 0,
+    targetNodeId: null,
   };
 }
 
@@ -6499,6 +7487,7 @@ function normalizeGame(rawGame) {
         }))
       : [],
     clusters: Array.isArray(rawGame.clusters) ? rawGame.clusters.map(normalizeCluster) : [],
+    logicNodes: Array.isArray(rawGame.logicNodes) ? rawGame.logicNodes.map(normalizeLogicNode) : [],
     nodes: Array.isArray(rawGame.nodes)
       ? rawGame.nodes.map((node, index) => normalizeNode(node, index, rawGame))
       : [],
@@ -6520,6 +7509,12 @@ function normalizeGame(rawGame) {
     }
     if (!node.position) {
       node.position = { x: 120 + index * 40, y: 120 + index * 30 };
+    }
+  });
+
+  normalized.logicNodes.forEach((logicNode, index) => {
+    if (!logicNode.position) {
+      logicNode.position = { x: 220 + index * 30, y: 180 + index * 24 };
     }
   });
 
@@ -6703,6 +7698,83 @@ function normalizeCluster(cluster, index) {
   };
 }
 
+function normalizeLogicNode(logicNode, index) {
+  return {
+    id: logicNode?.id || createId("logic"),
+    name: logicNode?.name || `Logic ${index + 1}`,
+    targetNodeId: logicNode?.targetNodeId || null,
+    position: {
+      x: parseNumberOrFallback(logicNode?.position?.x, 280 + index * 26),
+      y: parseNumberOrFallback(logicNode?.position?.y, 220 + index * 22),
+    },
+    triggers: Array.isArray(logicNode?.triggers)
+      ? logicNode.triggers.map((trigger, triggerIndex) => normalizeLogicTrigger(trigger, triggerIndex))
+      : [],
+    actions: Array.isArray(logicNode?.actions)
+      ? logicNode.actions.map((action, actionIndex) => normalizeLogicAction(action, actionIndex))
+      : [],
+  };
+}
+
+function normalizeLogicTrigger(trigger, index) {
+  const base = createLogicTrigger(
+    ["passSelf", "passNode", "passAnyNode", "variableChange", "event"].includes(trigger?.kind)
+      ? trigger.kind
+      : "passSelf",
+    trigger?.id || createId("logic-trigger")
+  );
+  const variableType = ["tracker", "flag", "profile", "string"].includes(trigger?.variableType)
+    ? trigger.variableType
+    : base.variableType;
+  return {
+    ...base,
+    kind: base.kind,
+    targetNodeId: trigger?.targetNodeId || null,
+    variableType,
+    variableId: trigger?.variableId || null,
+    operator: typeof trigger?.operator === "string" ? trigger.operator : base.operator,
+    value:
+      variableType === "tracker"
+        ? parseNumberOrFallback(trigger?.value, 0)
+        : variableType === "flag" || variableType === "profile"
+          ? trigger?.value ?? null
+          : typeof trigger?.value === "string"
+            ? trigger.value
+            : "",
+    eventName: typeof trigger?.eventName === "string" ? trigger.eventName : index === 0 ? "" : "",
+  };
+}
+
+function normalizeLogicAction(action, index) {
+  const base = createLogicAction(
+    ["emitEvent", "changeVariable", "jumpToNode"].includes(action?.kind) ? action.kind : "emitEvent",
+    action?.id || createId("logic-action")
+  );
+  const variableType = ["tracker", "flag", "profile", "string"].includes(action?.variableType)
+    ? action.variableType
+    : base.variableType;
+  return {
+    ...base,
+    kind: base.kind,
+    eventName: typeof action?.eventName === "string" ? action.eventName : index === 0 ? "" : "",
+    action:
+      action?.action === "increase" || action?.action === "decrease" || action?.action === "set"
+        ? action.action
+        : base.action,
+    variableType,
+    variableId: action?.variableId || null,
+    value:
+      variableType === "tracker"
+        ? parseNumberOrFallback(action?.value, 0)
+        : variableType === "flag" || variableType === "profile"
+          ? action?.value ?? null
+          : typeof action?.value === "string"
+            ? action.value
+            : "",
+    targetNodeId: action?.targetNodeId || null,
+  };
+}
+
 function normalizeRequirement(baseRequirement, rawRequirement) {
   return {
     ...baseRequirement,
@@ -6728,6 +7800,7 @@ function validateGame(game) {
   }
 
   collectDuplicateIssues(game.nodes, "name", "message name", issues);
+  collectDuplicateIssues(game.logicNodes || [], "id", "logic node id", issues);
   collectDuplicateIssues(game.chapters, "id", "chapter id", issues);
   collectDuplicateIssues(game.trackers, "id", "integer id", issues);
   collectDuplicateIssues(game.flags, "id", "enum id", issues);
@@ -6827,6 +7900,50 @@ function validateGame(game) {
     });
   });
 
+  game.clusters.forEach((cluster) => {
+    if (cluster.targetNodeId && !getPassTargetById(game, cluster.targetNodeId)) {
+      issues.push(makeIssue("error", `Cluster "${cluster.name}" points to a missing node.`, cluster.id));
+    }
+  });
+
+  (game.logicNodes || []).forEach((logicNode) => {
+    if (logicNode.targetNodeId && !getPassTargetById(game, logicNode.targetNodeId)) {
+      issues.push(makeIssue("error", `Logic node "${logicNode.name}" points to a missing continue target.`, logicNode.id));
+    }
+
+    logicNode.triggers.forEach((trigger) => {
+      if (trigger.kind === "passNode" && trigger.targetNodeId && !getPassTargetById(game, trigger.targetNodeId)) {
+        issues.push(makeIssue("error", `Logic node "${logicNode.name}" watches a missing node.`, logicNode.id));
+      }
+      if (trigger.kind === "variableChange") {
+        if (!getVariableById(game, trigger.variableType, trigger.variableId)) {
+          issues.push(makeIssue("error", `Logic node "${logicNode.name}" watches a missing variable.`, logicNode.id));
+        } else if ((trigger.variableType === "flag" || trigger.variableType === "profile") && !isValidStateValue(game, trigger.variableType, trigger.variableId, trigger.value) && !["changed"].includes(trigger.operator)) {
+          issues.push(makeIssue("error", `Logic node "${logicNode.name}" watches an invalid state value.`, logicNode.id));
+        }
+      }
+      if (trigger.kind === "event" && !String(trigger.eventName || "").trim()) {
+        issues.push(makeIssue("error", `Logic node "${logicNode.name}" has an event trigger with no event name.`, logicNode.id));
+      }
+    });
+
+    logicNode.actions.forEach((action) => {
+      if (action.kind === "emitEvent" && !String(action.eventName || "").trim()) {
+        issues.push(makeIssue("error", `Logic node "${logicNode.name}" emits an empty event name.`, logicNode.id));
+      }
+      if (action.kind === "changeVariable") {
+        if (!getVariableById(game, action.variableType, action.variableId)) {
+          issues.push(makeIssue("error", `Logic node "${logicNode.name}" changes a missing variable.`, logicNode.id));
+        } else if ((action.variableType === "flag" || action.variableType === "profile") && !isValidStateValue(game, action.variableType, action.variableId, action.value)) {
+          issues.push(makeIssue("error", `Logic node "${logicNode.name}" sets an invalid state value.`, logicNode.id));
+        }
+      }
+      if (action.kind === "jumpToNode" && action.targetNodeId && !getPassTargetById(game, action.targetNodeId)) {
+        issues.push(makeIssue("error", `Logic node "${logicNode.name}" jumps to a missing node.`, logicNode.id));
+      }
+    });
+  });
+
   game.nodes.forEach((node) => {
     if (!getChapterById(game, node.chapterId)) {
       issues.push(makeIssue("error", `Message "${node.name}" is assigned to a missing chapter.`, node.id));
@@ -6860,7 +7977,7 @@ function validateGame(game) {
     node.options.forEach((option) => {
       if (option.terminal === "target" && !option.targetNodeId) {
         if (!option.targetClusterId) {
-          issues.push(makeIssue("error", `Option "${option.text}" has no target message.`, node.id));
+          issues.push(makeIssue("error", `Option "${option.text}" has no target node.`, node.id));
         }
       }
       if (option.terminal === "target" && option.targetClusterId && !getClusterById(game, option.targetClusterId)) {
@@ -6872,10 +7989,10 @@ function validateGame(game) {
         getClusterById(game, option.targetClusterId) &&
         !resolveOptionTargetNodeId(game, option)
       ) {
-        issues.push(makeIssue("error", `Option "${option.text}" targets a cluster with no target message.`, node.id));
+        issues.push(makeIssue("error", `Option "${option.text}" targets a cluster with no target node.`, node.id));
       }
-      if (option.terminal === "target" && resolveOptionTargetNodeId(game, option) && !getNodeById(game, resolveOptionTargetNodeId(game, option))) {
-        issues.push(makeIssue("error", `Option "${option.text}" targets a missing message.`, node.id));
+      if (option.terminal === "target" && resolveOptionTargetNodeId(game, option) && !getPassTargetById(game, resolveOptionTargetNodeId(game, option))) {
+        issues.push(makeIssue("error", `Option "${option.text}" targets a missing node.`, node.id));
       }
 
       option.requirements.forEach((requirement) => {
@@ -6952,8 +8069,14 @@ function validateGame(game) {
     });
   });
 
-  getUnreachableNodes(game).forEach((node) => {
-    issues.push(makeIssue("warning", `Message "${node.name}" is unreachable from the opening path.`, node.id));
+  getUnreachableNodes(game).forEach((target) => {
+    issues.push(
+      makeIssue(
+        "warning",
+        `${target.kind === "logic" ? "Logic node" : "Message"} "${target.name}" is unreachable from the opening path.`,
+        target.id
+      )
+    );
   });
 
   return issues;
@@ -6964,35 +8087,44 @@ function getUnreachableNodes(game) {
   const queue = [getGameStartNodeId(game)];
 
   while (queue.length) {
-    const nodeId = queue.shift();
-    if (!nodeId || reachableIds.has(nodeId)) {
+    const targetId = queue.shift();
+    if (!targetId || reachableIds.has(targetId)) {
       continue;
     }
 
-    const node = getNodeById(game, nodeId);
-    if (!node) {
+    const target = getPassTargetById(game, targetId);
+    if (!target) {
       continue;
     }
 
-    reachableIds.add(nodeId);
+    reachableIds.add(targetId);
 
-    node.options.forEach((option) => {
-      if (option.terminal === "target") {
-        const targetNodeId = resolveOptionTargetNodeId(game, option);
-        if (targetNodeId) {
-          queue.push(targetNodeId);
+    if (getNodeById(game, target.id)) {
+      target.options.forEach((option) => {
+        if (option.terminal === "target") {
+          const nextTargetId = resolveOptionTargetNodeId(game, option);
+          if (nextTargetId) {
+            queue.push(nextTargetId);
+          }
         }
-      }
-      if (option.terminal === "chapterEnd") {
-        const nextChapter = getNextChapter(game, node.chapterId);
-        if (nextChapter?.startNodeId) {
-          queue.push(nextChapter.startNodeId);
+        if (option.terminal === "chapterEnd") {
+          const nextChapter = getNextChapter(game, target.chapterId);
+          if (nextChapter?.startNodeId) {
+            queue.push(nextChapter.startNodeId);
+          }
         }
-      }
-    });
+      });
+    } else if (target.targetNodeId) {
+      queue.push(target.targetNodeId);
+    }
   }
 
-  return game.nodes.filter((node) => !reachableIds.has(node.id));
+  return [
+    ...game.nodes.filter((node) => !reachableIds.has(node.id)).map((node) => ({ ...node, kind: "message" })),
+    ...(game.logicNodes || [])
+      .filter((logicNode) => !reachableIds.has(logicNode.id))
+      .map((logicNode) => ({ ...logicNode, kind: "logic" })),
+  ];
 }
 
 function collectDuplicateIssues(items, field, label, issues) {
@@ -7255,20 +8387,171 @@ function buildTrackerDisplayGroups(game) {
   return grouped.filter((group) => group.trackers.length);
 }
 
-function applyVariableEffect(game, playState, effect, profileStack = new Set()) {
+function createLogicExecutionContext(game, playState) {
+  return {
+    game,
+    playState,
+    steps: 0,
+    pendingJumpTargetId: null,
+  };
+}
+
+function maybeDispatchVariableChange(game, playState, logicContext, variableType, variableId, previousValue, nextValue) {
+  if (!logicContext || previousValue === nextValue) {
+    return;
+  }
+
+  dispatchLogicVariableChange(game, playState, logicContext, {
+    variableType,
+    variableId,
+    previousValue,
+    nextValue,
+  });
+}
+
+function guardLogicExecution(logicContext) {
+  if (!logicContext) {
+    return true;
+  }
+  logicContext.steps += 1;
+  if (logicContext.steps <= LOGIC_EXECUTION_LIMIT) {
+    return true;
+  }
+
+  logicContext.playState.status = "error";
+  logicContext.playState.log.push({
+    type: "event",
+    label: "Runtime error",
+    text: "Logic node execution exceeded the safety limit.",
+  });
+  return false;
+}
+
+function dispatchLogicNodePass(game, playState, logicContext, passedTarget) {
+  executeMatchingLogicNodes(
+    game,
+    playState,
+    logicContext,
+    (logicNode, trigger) =>
+      trigger.kind === "passAnyNode" ||
+      (trigger.kind === "passSelf" && logicNode.id === passedTarget.id && !getNodeById(game, passedTarget.id)) ||
+      (trigger.kind === "passNode" && trigger.targetNodeId === passedTarget.id)
+  );
+}
+
+function dispatchLogicVariableChange(game, playState, logicContext, change) {
+  executeMatchingLogicNodes(
+    game,
+    playState,
+    logicContext,
+    (_logicNode, trigger) => {
+      if (trigger.kind !== "variableChange") {
+        return false;
+      }
+      if (trigger.variableType !== change.variableType || trigger.variableId !== change.variableId) {
+        return false;
+      }
+
+      if (trigger.operator === "changed") {
+        return true;
+      }
+      if (trigger.operator === "increase") {
+        return typeof change.nextValue === "number" && typeof change.previousValue === "number" && change.nextValue > change.previousValue;
+      }
+      if (trigger.operator === "decrease") {
+        return typeof change.nextValue === "number" && typeof change.previousValue === "number" && change.nextValue < change.previousValue;
+      }
+      return compareValues(change.nextValue, trigger.operator, trigger.value);
+    }
+  );
+}
+
+function dispatchLogicEvent(game, playState, logicContext, eventName) {
+  executeMatchingLogicNodes(
+    game,
+    playState,
+    logicContext,
+    (_logicNode, trigger) => trigger.kind === "event" && String(trigger.eventName || "").trim() === String(eventName || "").trim()
+  );
+}
+
+function executeMatchingLogicNodes(game, playState, logicContext, predicate) {
+  for (const logicNode of game.logicNodes || []) {
+    if (playState.status !== "active") {
+      return;
+    }
+    if (!logicNode.triggers.some((trigger) => predicate(logicNode, trigger))) {
+      continue;
+    }
+    if (!guardLogicExecution(logicContext)) {
+      return;
+    }
+    executeLogicNodeActions(game, playState, logicNode, logicContext);
+  }
+}
+
+function executeLogicNodeActions(game, playState, logicNode, logicContext) {
+  for (const action of logicNode.actions) {
+    if (playState.status !== "active") {
+      return;
+    }
+
+    if (action.kind === "emitEvent") {
+      const eventName = String(action.eventName || "").trim();
+      if (eventName) {
+        dispatchLogicEvent(game, playState, logicContext, eventName);
+      }
+      continue;
+    }
+
+    if (action.kind === "changeVariable") {
+      applyVariableEffect(
+        game,
+        playState,
+        {
+          action: action.action,
+          variableType: action.variableType,
+          variableId: action.variableId,
+          value: action.value,
+        },
+        new Set(),
+        logicContext
+      );
+      continue;
+    }
+
+    if (action.kind === "jumpToNode" && action.targetNodeId) {
+      logicContext.pendingJumpTargetId = action.targetNodeId;
+    }
+  }
+}
+
+function consumeLogicJumpTarget(logicContext) {
+  if (!logicContext?.pendingJumpTargetId) {
+    return null;
+  }
+  const targetId = logicContext.pendingJumpTargetId;
+  logicContext.pendingJumpTargetId = null;
+  return targetId;
+}
+
+function applyVariableEffect(game, playState, effect, profileStack = new Set(), logicContext = null) {
   if (effect.variableType === "tracker") {
     const tracker = getTrackerById(game, effect.variableId);
     if (!tracker) {
       return;
     }
 
+    const before = playState.trackers[tracker.id];
     if (effect.action === "set") {
       playState.trackers[tracker.id] = sanitizeTrackerValue(tracker, parseNumberOrFallback(effect.value, 0));
+      maybeDispatchVariableChange(game, playState, logicContext, effect.variableType, tracker.id, before, playState.trackers[tracker.id]);
       return;
     }
 
     const delta = effect.action === "decrease" ? -Math.abs(parseNumberOrFallback(effect.value, 0)) : Math.abs(parseNumberOrFallback(effect.value, 0));
     playState.trackers[tracker.id] = applyTrackerEffect(tracker, playState.trackers[tracker.id], delta);
+    maybeDispatchVariableChange(game, playState, logicContext, effect.variableType, tracker.id, before, playState.trackers[tracker.id]);
     return;
   }
 
@@ -7276,18 +8559,22 @@ function applyVariableEffect(game, playState, effect, profileStack = new Set()) 
     if (!getFlagById(game, effect.variableId)) {
       return;
     }
+    const before = playState.flags[effect.variableId];
     playState.flags[effect.variableId] = effect.value ?? null;
+    maybeDispatchVariableChange(game, playState, logicContext, effect.variableType, effect.variableId, before, playState.flags[effect.variableId]);
     return;
   }
 
   if (effect.variableType === "profile") {
-    setProfileState(game, playState, effect.variableId, effect.value ?? null, profileStack);
+    setProfileState(game, playState, effect.variableId, effect.value ?? null, profileStack, logicContext);
     return;
   }
 
   const entry = game.strings.find((item) => item.id === effect.variableId);
   if (entry) {
+    const before = playState.strings[entry.id];
     playState.strings[entry.id] = String(effect.value ?? "");
+    maybeDispatchVariableChange(game, playState, logicContext, effect.variableType, entry.id, before, playState.strings[entry.id]);
   }
 }
 
@@ -7299,13 +8586,15 @@ function applyProfileStartStates(game, playState) {
   });
 }
 
-function setProfileState(game, playState, profileId, stateName, profileStack = new Set()) {
+function setProfileState(game, playState, profileId, stateName, profileStack = new Set(), logicContext = null) {
   const profile = getProfileById(game, profileId);
   if (!profile) {
     return;
   }
 
+  const previousState = playState.profiles[profile.id];
   playState.profiles[profile.id] = stateName ?? null;
+  maybeDispatchVariableChange(game, playState, logicContext, "profile", profile.id, previousState, playState.profiles[profile.id]);
   if (stateName === null) {
     return;
   }
@@ -7323,7 +8612,7 @@ function setProfileState(game, playState, profileId, stateName, profileStack = n
 
   profileStack.add(stackKey);
   state.mappings.forEach((mapping) => {
-    applyVariableEffect(game, playState, mapping, profileStack);
+    applyVariableEffect(game, playState, mapping, profileStack, logicContext);
   });
   profileStack.delete(stackKey);
 }
@@ -7351,8 +8640,7 @@ function createPlayState(game) {
 
   const startNode = getNodeById(game, state.currentNodeId);
   if (startNode) {
-    appendMessageLog(state, startNode);
-    maybeCompleteOnEndpoint(state, startNode);
+    advancePlayStateToTarget(game, state, startNode.id, createLogicExecutionContext(game, state));
   } else {
     state.status = "error";
     state.log.push({
@@ -7488,6 +8776,7 @@ function serializeGame(game) {
       return nextOption;
     }),
   }));
+  serialized.logicNodes = serialized.logicNodes || [];
   serialized.profiles = (serialized.profiles || []).map((profile) => ({
     ...profile,
     states: (profile.states || []).map((state) => ({
@@ -7515,6 +8804,13 @@ function serializePlayState(playState) {
 
 function getGameCacheKey(game) {
   const snapshot = serializeGame(game);
+  snapshot.logicNodes = (snapshot.logicNodes || []).map((logicNode) => ({
+    id: logicNode.id,
+    name: logicNode.name,
+    targetNodeId: logicNode.targetNodeId,
+    triggers: logicNode.triggers,
+    actions: logicNode.actions,
+  }));
   snapshot.nodes = snapshot.nodes.map((node) => ({
     id: node.id,
     name: node.name,
@@ -7533,6 +8829,14 @@ function buildNodeSecondaryLine(game, node) {
 
 function getNodeById(game, nodeId) {
   return game?.nodes?.find((node) => node.id === nodeId) || null;
+}
+
+function getLogicNodeById(game, logicNodeId) {
+  return game?.logicNodes?.find((logicNode) => logicNode.id === logicNodeId) || null;
+}
+
+function getPassTargetById(game, targetId) {
+  return getNodeById(game, targetId) || getLogicNodeById(game, targetId) || null;
 }
 
 function getClusterById(game, clusterId) {
@@ -7558,6 +8862,32 @@ function getNextChapter(game, chapterId) {
 
 function getTrackerById(game, trackerId) {
   return game?.trackers.find((tracker) => tracker.id === trackerId) || null;
+}
+
+function getVariableById(game, variableType, variableId) {
+  if (variableType === "flag") {
+    return getFlagById(game, variableId);
+  }
+  if (variableType === "profile") {
+    return getProfileById(game, variableId);
+  }
+  if (variableType === "string") {
+    return game?.strings.find((entry) => entry.id === variableId) || null;
+  }
+  return getTrackerById(game, variableId);
+}
+
+function isValidStateValue(game, variableType, variableId, value) {
+  if (value === null || value === undefined) {
+    return true;
+  }
+  if (variableType === "flag") {
+    return Boolean(getFlagById(game, variableId)?.states.includes(value));
+  }
+  if (variableType === "profile") {
+    return Boolean(getProfileById(game, variableId)?.states.some((state) => state.name === value));
+  }
+  return true;
 }
 
 function getTrackerGroupById(game, groupId) {
