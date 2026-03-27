@@ -632,6 +632,7 @@ h3 {
 
 .graph-node {
   position: absolute;
+  z-index: 1;
   width: 360px;
   padding: 18px 18px 16px;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -643,6 +644,7 @@ h3 {
 
 .graph-cluster {
   position: absolute;
+  z-index: 1;
   min-width: 136px;
   padding: 0;
   color: var(--text);
@@ -650,14 +652,30 @@ h3 {
 
 .graph-logic-node {
   position: absolute;
+  z-index: 1;
+  min-width: 168px;
+  padding: 0;
+  color: var(--text);
+}
+
+.graph-special-node {
+  position: absolute;
+  z-index: 1;
   min-width: 168px;
   padding: 0;
   color: var(--text);
 }
 
 .graph-node.selected {
+  z-index: 6;
   border-color: rgba(242, 200, 176, 0.55);
   box-shadow: 0 18px 44px rgba(221, 131, 84, 0.14);
+}
+
+.graph-cluster.selected,
+.graph-logic-node.selected,
+.graph-special-node.selected {
+  z-index: 6;
 }
 
 .graph-cluster.selected .cluster-shell {
@@ -666,6 +684,11 @@ h3 {
 }
 
 .graph-logic-node.selected .logic-node-shell {
+  border-color: rgba(242, 200, 176, 0.55);
+  box-shadow: 0 16px 34px rgba(221, 131, 84, 0.12);
+}
+
+.graph-special-node.selected .special-node-shell {
   border-color: rgba(242, 200, 176, 0.55);
   box-shadow: 0 16px 34px rgba(221, 131, 84, 0.12);
 }
@@ -707,6 +730,22 @@ h3 {
   text-align: center;
 }
 
+.special-node-shell {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  padding: 14px 22px;
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(22, 35, 26, 0.96), rgba(12, 22, 18, 0.92));
+  box-shadow: 0 12px 28px rgba(1, 7, 10, 0.22);
+  text-align: center;
+}
+
+.special-node-shell.end-node {
+  background: linear-gradient(180deg, rgba(40, 18, 24, 0.96), rgba(24, 12, 16, 0.92));
+}
+
 .cluster-label,
 .cluster-target {
   margin: 0;
@@ -715,6 +754,12 @@ h3 {
 .logic-node-label,
 .logic-node-meta,
 .logic-node-target {
+  margin: 0;
+}
+
+.special-node-code,
+.special-node-label,
+.special-node-target {
   margin: 0;
 }
 
@@ -737,6 +782,27 @@ h3 {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent-soft);
+}
+
+.special-node-code,
+.node-code {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-soft);
+}
+
+.special-node-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.special-node-target {
+  font-size: 0.78rem;
+  color: var(--muted);
 }
 
 .logic-node-meta,
@@ -767,6 +833,17 @@ h3 {
   transform: translateY(-50%);
 }
 
+.special-node-handle {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(221, 131, 84, 0.65);
+  border-radius: 999px;
+  background: rgba(8, 17, 24, 0.96);
+  transform: translateY(-50%);
+}
+
 .cluster-handle-in {
   left: -8px;
 }
@@ -781,6 +858,15 @@ h3 {
 }
 
 .logic-node-handle-out {
+  right: -8px;
+  cursor: crosshair;
+}
+
+.special-node-handle-in {
+  left: -8px;
+}
+
+.special-node-handle-out {
   right: -8px;
   cursor: crosshair;
 }
@@ -809,6 +895,10 @@ h3 {
 
 .node-topline .eyebrow {
   margin-bottom: 6px;
+}
+
+.node-code {
+  margin: 0 0 6px;
 }
 
 .node-topline h3 {
@@ -1197,6 +1287,9 @@ h3 {
 .graph-fab {
   width: 42px;
   height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
   background: rgba(8, 18, 26, 0.9);
@@ -1205,8 +1298,14 @@ h3 {
   backdrop-filter: blur(18px);
 }
 
-.graph-fab-primary {
-  background: linear-gradient(180deg, rgba(232, 132, 80, 0.28), rgba(232, 132, 80, 0.14));
+.graph-fab-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.graph-fab[disabled] {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .create-actions {

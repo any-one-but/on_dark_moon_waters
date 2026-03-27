@@ -24,7 +24,6 @@
         <aside class="pane play-pane-left">
           <div class="play-pane-scroll">
             <h1 id="playGameName">No game loaded</h1>
-            <p id="playChapterName" class="subhead"></p>
             <hr class="panel-rule play-rule" />
             <div class="button-stack">
               <button id="playLoadGameButton" class="button secondary" type="button">
@@ -122,22 +121,25 @@
           </aside>
 
           <div class="graph-floating-controls">
-            <button id="graphAddNodeButton" class="graph-fab graph-fab-primary" type="button" title="Add message">
-              +
+            <button id="graphAddNodeButton" class="graph-fab" type="button" title="Add story node" aria-label="Add story node">
+              <span class="graph-fab-icon" aria-hidden="true">▤</span>
             </button>
-            <button id="graphAddClusterButton" class="graph-fab" type="button" title="Add cluster">
-              ◌
+            <button id="graphAddClusterButton" class="graph-fab" type="button" title="Add cluster" aria-label="Add cluster">
+              <span class="graph-fab-icon" aria-hidden="true">◌</span>
             </button>
-            <button id="graphAddLogicNodeButton" class="graph-fab" type="button" title="Add logic node">
-              ◇
+            <button id="graphAddLogicNodeButton" class="graph-fab" type="button" title="Add logic node" aria-label="Add logic node">
+              <span class="graph-fab-icon" aria-hidden="true">◇</span>
+            </button>
+            <button id="graphAddEndNodeButton" class="graph-fab" type="button" title="Place end node" aria-label="Place end node">
+              <span class="graph-fab-icon" aria-hidden="true">◎</span>
             </button>
             <button id="graphCenterButton" class="graph-fab" type="button" title="Center graph">
-              ⌖
+              <span class="graph-fab-icon" aria-hidden="true">⌖</span>
             </button>
             <div class="graph-zoom-cluster">
-              <button id="graphZoomOutButton" class="graph-fab" type="button" title="Zoom out">-</button>
+              <button id="graphZoomOutButton" class="graph-fab" type="button" title="Zoom out" aria-label="Zoom out"><span class="graph-fab-icon" aria-hidden="true">-</span></button>
               <span id="graphZoomLabel" class="zoom-label">100%</span>
-              <button id="graphZoomInButton" class="graph-fab" type="button" title="Zoom in">+</button>
+              <button id="graphZoomInButton" class="graph-fab" type="button" title="Zoom in" aria-label="Zoom in"><span class="graph-fab-icon" aria-hidden="true">+</span></button>
             </div>
           </div>
         </div>
