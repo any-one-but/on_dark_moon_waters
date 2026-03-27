@@ -631,6 +631,18 @@ h3 {
   pointer-events: none;
 }
 
+.menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.menu-overlay-popover {
+  position: fixed;
+  pointer-events: auto;
+}
+
 .graph-node {
   position: absolute;
   width: 360px;
@@ -968,8 +980,11 @@ h3 {
 }
 
 .floating-node-panel-shell {
-  width: min(340px, 34vw);
+  display: grid;
+  gap: 14px;
+  width: min(1040px, calc(100vw - (var(--create-gutter) * 2) - 16px));
   padding: 14px;
+  overflow: visible;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: rgba(8, 18, 26, 0.96);
@@ -979,6 +994,11 @@ h3 {
 
 .floating-node-panel-shell .form-block {
   gap: 10px;
+  max-height: calc(100vh - (var(--create-gutter) * 2) - 28px);
+  overflow-y: auto;
+  overflow-x: visible;
+  overscroll-behavior: contain;
+  padding-right: 4px;
 }
 
 .floating-node-panel-shell .paper-note {
@@ -1208,6 +1228,12 @@ h3 {
   gap: 8px;
 }
 
+.section-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .panel-icon-button {
   width: 32px;
   min-width: 32px;
@@ -1226,6 +1252,28 @@ h3 {
 
 .select-menu {
   width: 100%;
+}
+
+.select-menu-fit {
+  width: max-content;
+  max-width: 100%;
+}
+
+.select-menu-fit .select-menu-button {
+  width: auto;
+  min-width: 0;
+}
+
+.select-width-target {
+  width: 162px;
+}
+
+.select-width-display {
+  width: 194px;
+}
+
+.select-width-failure {
+  width: 232px;
 }
 
 .select-menu-input {
@@ -1263,7 +1311,10 @@ h3 {
 .select-menu .popover-menu {
   left: 0;
   right: auto;
+  z-index: 24;
   min-width: 100%;
+  width: max-content;
+  max-width: min(360px, calc(100vw - (var(--create-gutter) * 2) - 24px));
   max-height: 260px;
   overflow-y: auto;
 }
@@ -1321,6 +1372,90 @@ h3 {
   background: rgba(255, 255, 255, 0.04);
   display: grid;
   gap: 10px;
+}
+
+.rule-table {
+  display: grid;
+  gap: 8px;
+}
+
+.rule-add-wrap {
+  display: flex;
+  justify-content: center;
+  padding-top: 6px;
+}
+
+.option-meta-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  column-gap: 22px;
+  row-gap: 12px;
+}
+
+.option-meta-controls {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 20px;
+  min-width: 0;
+}
+
+.option-meta-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.option-meta-inline label {
+  margin: 0;
+}
+
+.rule-table-check,
+.sentence-row-check {
+  grid-template-columns: 86px 116px 176px 220px minmax(124px, 1fr) 32px;
+}
+
+.rule-table-set,
+.sentence-row-set {
+  grid-template-columns: 132px 116px 176px minmax(124px, 1fr) 32px;
+}
+
+.rule-table-header,
+.sentence-row {
+  display: grid;
+  align-items: center;
+  gap: 8px;
+}
+
+.rule-table-header {
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rule-table-header span,
+.sentence-cell {
+  min-width: 0;
+}
+
+.sentence-row .field,
+.sentence-row .select-menu {
+  width: 100%;
+}
+
+.sentence-row .field,
+.sentence-row .select-menu-button {
+  min-height: 38px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.sentence-remove {
+  justify-self: end;
 }
 
 .item-actions {
@@ -1539,6 +1674,7 @@ h3 {
           </div>
         </div>
       </section>
+      <div id="menuOverlay" class="menu-overlay"></div>
     </main>
     <script>
 const APP_NAME = "Trackline";
@@ -1565,8 +1701,8 @@ const CREATE_TABS = [
 
 const TRACKER_OPERATORS = ["=", "!=", "<", ">", "<=", ">="];
 const REQUIREMENT_JOIN_OPTIONS = [
-  { value: "and", label: "All must pass" },
-  { value: "or", label: "Any may pass" },
+  { value: "and", label: "AND" },
+  { value: "or", label: "OR" },
 ];
 const DIRECTION_OPTIONS = [
   { value: "both", label: "Can increase or decrease" },
@@ -1642,6 +1778,7 @@ const refs = {
   graphConnections: document.getElementById("graphConnections"),
   graphNodes: document.getElementById("graphNodes"),
   graphOverlays: document.getElementById("graphOverlays"),
+  menuOverlay: document.getElementById("menuOverlay"),
   editorInspectorShell: document.getElementById("editorInspectorShell"),
   editorInspector: document.getElementById("editorInspector"),
   graphAddClusterButton: document.getElementById("graphAddClusterButton"),
@@ -1728,6 +1865,7 @@ function bindGlobalEvents() {
   refs.editorInspector.addEventListener("change", handleInspectorChange);
   refs.graphOverlays.addEventListener("click", handleInspectorClick);
   refs.graphOverlays.addEventListener("change", handleInspectorChange);
+  refs.menuOverlay.addEventListener("click", handleOverlayClick);
   refs.graphAddNodeButton.addEventListener("click", addNodeAtViewportCenter);
   refs.graphAddClusterButton.addEventListener("click", addClusterAtViewportCenter);
   refs.graphCenterButton.addEventListener("click", centerGraph);
@@ -1762,6 +1900,8 @@ function renderApp() {
   } else if (appState.view === "create") {
     renderCreateView();
   }
+
+  renderMenuOverlay();
 }
 
 function renderHomeView() {
@@ -2167,6 +2307,7 @@ function renderSelectControl({
   value = "",
   options = [],
   attributes = {},
+  className = "",
   placeholder = "Select an option",
   emptyLabel = "No options available",
 }) {
@@ -2183,9 +2324,30 @@ function renderSelectControl({
   const isOpen = appState.selection.selectMenuId === menuId;
   const disabled = optionList.length === 0;
   const label = selectedOption?.label || (disabled ? emptyLabel : placeholder);
+  const popoverMarkup = !disabled
+    ? `
+        <div class="select-menu-options hidden">
+          <div class="popover-menu">
+            ${optionList
+              .map(
+                (option) => `
+                  <button
+                    class="popover-item ${String(option.value) === String(normalizedValue) ? "is-selected" : ""}"
+                    type="button"
+                    data-action="select-menu-option"
+                    data-select-menu-id="${escapeAttr(menuId)}"
+                    data-select-menu-value="${escapeAttr(String(option.value))}"
+                  >${escapeHtml(option.label)}</button>
+                `
+              )
+              .join("")}
+          </div>
+        </div>
+      `
+    : "";
 
   return `
-    <div class="menu-wrap select-menu" data-select-menu-id="${escapeAttr(menuId)}">
+    <div class="menu-wrap select-menu ${escapeAttr(className)}" data-select-menu-id="${escapeAttr(menuId)}">
       <input
         type="hidden"
         class="select-menu-input"
@@ -2202,27 +2364,7 @@ function renderSelectControl({
         <span class="select-menu-label">${escapeHtml(label)}</span>
         <span class="select-menu-caret" aria-hidden="true">▾</span>
       </button>
-      ${
-        isOpen && !disabled
-          ? `
-              <div class="popover-menu">
-                ${optionList
-                  .map(
-                    (option) => `
-                      <button
-                        class="popover-item ${String(option.value) === String(normalizedValue) ? "is-selected" : ""}"
-                        type="button"
-                        data-action="select-menu-option"
-                        data-select-menu-id="${escapeAttr(menuId)}"
-                        data-select-menu-value="${escapeAttr(String(option.value))}"
-                      >${escapeHtml(option.label)}</button>
-                    `
-                  )
-                  .join("")}
-              </div>
-            `
-          : ""
-      }
+      ${popoverMarkup}
     </div>
   `;
 }
@@ -2672,7 +2814,6 @@ function renderClusterInspector(game, cluster) {
 }
 
 function renderParagraphInspector(game, node, paragraph) {
-  const paragraphIndex = node.paragraphs.findIndex((entry) => entry.id === paragraph.id);
   const actionMenuId = buildFloatingActionMenuKey("paragraph", node.id, paragraph.id);
   const actionMenuOpen = appState.selection.floatingActionMenuId === actionMenuId;
   return `
@@ -2712,16 +2853,20 @@ function renderParagraphInspector(game, node, paragraph) {
 
       <div class="item-card">
         <div class="inline-row">
-          <strong>Variable Checks</strong>
-          <div class="item-actions">
-            <button class="button small secondary" type="button" data-action="add-paragraph-variable-check">Add Check</button>
+          <div class="section-heading">
+            ${renderRuleIcon("checks", true)}
+            <strong>Check Variable</strong>
           </div>
         </div>
+        ${renderRuleTableHeader("check")}
         ${
           paragraph.requirements.length
             ? paragraph.requirements.map((requirement) => renderRequirementEditor(game, requirement)).join("")
             : '<p class="copy">No variable checks.</p>'
         }
+        <div class="rule-add-wrap">
+          <button class="list-add-fab" type="button" data-action="add-paragraph-variable-check" title="Add check variable">+</button>
+        </div>
       </div>
 
     </div>
@@ -2771,109 +2916,120 @@ function renderOptionInspector(game, node, option) {
         ${renderSelectControl({
           menuId: `option:${option.id}:terminal`,
           value: option.terminal,
+          className: "select-menu-fit select-width-target",
           attributes: { "data-option-field": "terminal" },
           options: TERMINAL_OPTIONS,
         })}
       </div>
 
-      ${
-        option.terminal === "target"
-          ? `
-            <div class="field-group">
-              <label>Target message</label>
+      <div class="item-card">
+        <div class="option-meta-row">
+          <div class="section-heading">
+            ${renderRuleIcon("effects", true)}
+            <strong>Set Variable</strong>
+          </div>
+          <div class="option-meta-controls">
+            <div class="option-meta-inline">
+              <label>Set Variable Display:</label>
               ${renderSelectControl({
-                menuId: `option:${option.id}:targetNodeId`,
-                value: option.targetNodeId || "",
-                attributes: { "data-option-field": "targetNodeId" },
-                options: [{ value: "", label: "Unassigned" }, ...getNodeOptions(game)],
+                menuId: `option:${option.id}:effectDisplayMode`,
+                value: option.effectDisplayMode,
+                className: "select-menu-fit select-width-display",
+                attributes: { "data-option-field": "effectDisplayMode" },
+                options: DISPLAY_OPTIONS,
               })}
             </div>
-          `
-          : ""
-      }
-
-      <div class="field-group">
-        <label>Failed Variable Check Behavior</label>
-        ${renderSelectControl({
-          menuId: `option:${option.id}:failureMode`,
-          value: option.failureMode,
-          attributes: { "data-option-field": "failureMode" },
-          options: FAILURE_OPTIONS,
-        })}
-      </div>
-
-      <div class="field-group">
-        <label>Variable Check Display</label>
-        ${renderSelectControl({
-          menuId: `option:${option.id}:requirementDisplayMode`,
-          value: option.requirementDisplayMode,
-          attributes: { "data-option-field": "requirementDisplayMode" },
-          options: DISPLAY_OPTIONS,
-        })}
-      </div>
-
-      ${
-        option.requirementDisplayMode === "custom"
-          ? `
-            <div class="field-group">
-              <label>Custom Variable Check Text</label>
-              <input class="field" data-option-field="requirementDisplayText" value="${escapeAttr(
-                option.requirementDisplayText
-              )}" />
-            </div>
-          `
-          : ""
-      }
-
-      <div class="field-group">
-        <label>Set Variable Display</label>
-        ${renderSelectControl({
-          menuId: `option:${option.id}:effectDisplayMode`,
-          value: option.effectDisplayMode,
-          attributes: { "data-option-field": "effectDisplayMode" },
-          options: DISPLAY_OPTIONS,
-        })}
-      </div>
-
-      ${
-        option.effectDisplayMode === "custom"
-          ? `
-            <div class="field-group">
-              <label>Custom Set Variable Text</label>
-              <input class="field" data-option-field="effectDisplayText" value="${escapeAttr(
-                option.effectDisplayText
-              )}" />
-            </div>
-          `
-          : ""
-      }
-
-      <div class="item-card">
-        <div class="inline-row">
-          <strong>Variable Checks</strong>
-          <div class="item-actions">
-            <button class="button small secondary" type="button" data-action="add-variable-check">Add Check</button>
           </div>
         </div>
         ${
-          option.requirements.length
-            ? option.requirements.map((requirement) => renderRequirementEditor(game, requirement)).join("")
-            : '<p class="copy">No variable checks.</p>'
+          option.effectDisplayMode === "custom"
+            ? `
+              <div class="field-group">
+                <label>Custom Set Variable Text</label>
+                <input class="field" data-option-field="effectDisplayText" value="${escapeAttr(
+                  option.effectDisplayText
+                )}" />
+              </div>
+            `
+            : ""
         }
-      </div>
-
-      <div class="item-card">
-        <div class="inline-row">
-          <strong>Set Variables</strong>
-          <button class="button small secondary" type="button" data-action="add-variable-effect">Add Set Variable</button>
-        </div>
+        ${renderRuleTableHeader("set")}
         ${
           option.variableEffects.length
             ? option.variableEffects.map((effect) => renderVariableEffectEditor(game, effect)).join("")
             : '<p class="copy">No set-variable rules.</p>'
         }
+        <div class="rule-add-wrap">
+          <button class="list-add-fab" type="button" data-action="add-variable-effect" title="Add set variable">+</button>
+        </div>
       </div>
 
+      <div class="item-card">
+        <div class="option-meta-row">
+          <div class="section-heading">
+            ${renderRuleIcon("checks", true)}
+            <strong>Check Variable</strong>
+          </div>
+          <div class="option-meta-controls">
+            <div class="option-meta-inline">
+              <label>Failed Variable Check:</label>
+              ${renderSelectControl({
+                menuId: `option:${option.id}:failureMode`,
+                value: option.failureMode,
+                className: "select-menu-fit select-width-failure",
+                attributes: { "data-option-field": "failureMode" },
+                options: FAILURE_OPTIONS,
+              })}
+            </div>
+            <div class="option-meta-inline">
+              <label>Variable Check Display:</label>
+              ${renderSelectControl({
+                menuId: `option:${option.id}:requirementDisplayMode`,
+                value: option.requirementDisplayMode,
+                className: "select-menu-fit select-width-display",
+                attributes: { "data-option-field": "requirementDisplayMode" },
+                options: DISPLAY_OPTIONS,
+              })}
+            </div>
+          </div>
+        </div>
+        ${
+          option.requirementDisplayMode === "custom"
+            ? `
+              <div class="field-group">
+                <label>Custom Variable Check Text</label>
+                <input class="field" data-option-field="requirementDisplayText" value="${escapeAttr(
+                  option.requirementDisplayText
+                )}" />
+              </div>
+            `
+            : ""
+        }
+        ${renderRuleTableHeader("check")}
+        ${
+          option.requirements.length
+            ? option.requirements.map((requirement) => renderRequirementEditor(game, requirement)).join("")
+            : '<p class="copy">No variable checks.</p>'
+        }
+        <div class="rule-add-wrap">
+          <button class="list-add-fab" type="button" data-action="add-variable-check" title="Add check variable">+</button>
+        </div>
+      </div>
+
+    </div>
+  `;
+}
+
+function renderRuleTableHeader(kind) {
+  const labels =
+    kind === "set"
+      ? ["Action", "Type", "Variable", "Value"]
+      : ["Logic", "Type", "Variable", "Operator", "Value"];
+
+  return `
+    <div class="rule-table-header ${kind === "set" ? "rule-table-set" : "rule-table-check"}">
+      ${labels.map((label) => `<span>${escapeHtml(label)}</span>`).join("")}
+      <span></span>
     </div>
   `;
 }
@@ -2896,12 +3052,34 @@ function renderRequirementEditor(game, requirement) {
   const variableOptions = isInteger
     ? game.trackers.map((tracker) => ({ value: tracker.id, label: tracker.name }))
     : getVariableOptions(game, requirement.kind);
+  const operatorOptions = isInteger
+    ? [
+        { value: "=", label: "Equal to" },
+        { value: "!=", label: "Not equal to" },
+        { value: "<", label: "Less than" },
+        { value: ">", label: "Greater than" },
+        { value: "<=", label: "Less than or equal to" },
+        { value: ">=", label: "Greater than or equal to" },
+      ]
+    : [
+        { value: "=", label: "Equal to" },
+        { value: "!=", label: "Not equal to" },
+      ];
 
   return `
-    <div class="item-card">
-      <div class="inline-form">
-        <div class="field-group">
-          <label>Variable Type</label>
+    <div class="sentence-row sentence-row-check">
+      <div class="sentence-cell">
+        ${renderSelectControl({
+          menuId: `requirement:${requirement.id}:joinMode`,
+          value: requirement.joinMode,
+          attributes: {
+            "data-requirement-id": requirement.id,
+            "data-requirement-field": "joinMode",
+          },
+          options: REQUIREMENT_JOIN_OPTIONS,
+        })}
+      </div>
+      <div class="sentence-cell">
           ${renderSelectControl({
             menuId: `requirement:${requirement.id}:kind`,
             value: requirement.kind,
@@ -2915,9 +3093,8 @@ function renderRequirementEditor(game, requirement) {
               { value: "profile", label: "Profile" },
             ],
           })}
-        </div>
-        <div class="field-group">
-          <label>Variable</label>
+      </div>
+      <div class="sentence-cell">
           ${renderSelectControl({
             menuId: `requirement:${requirement.id}:targetId`,
             value: requirement.targetId || "",
@@ -2927,11 +3104,8 @@ function renderRequirementEditor(game, requirement) {
             },
             options: variableOptions,
           })}
-        </div>
       </div>
-      <div class="inline-form">
-        <div class="field-group">
-          <label>Operator</label>
+      <div class="sentence-cell">
           ${renderSelectControl({
             menuId: `requirement:${requirement.id}:operator`,
             value: requirement.operator,
@@ -2939,38 +3113,15 @@ function renderRequirementEditor(game, requirement) {
               "data-requirement-id": requirement.id,
               "data-requirement-field": "operator",
             },
-            options: isInteger
-              ? TRACKER_OPERATORS.map((operator) => ({ value: operator, label: operator }))
-              : [
-                  { value: "=", label: "=" },
-                  { value: "!=", label: "!=" },
-                ],
+            options: operatorOptions,
           })}
-        </div>
-        <div class="field-group">
-          <label>Value</label>
+      </div>
+      <div class="sentence-cell">
           ${valueControl}
-        </div>
       </div>
-      <div class="inline-form">
-        <div class="field-group">
-          <label>Logic</label>
-          ${renderSelectControl({
-            menuId: `requirement:${requirement.id}:joinMode`,
-            value: requirement.joinMode,
-            attributes: {
-              "data-requirement-id": requirement.id,
-              "data-requirement-field": "joinMode",
-            },
-            options: REQUIREMENT_JOIN_OPTIONS,
-          })}
-        </div>
-      </div>
-      <div class="item-actions">
-        <button class="button small ghost" type="button" data-action="remove-requirement" data-requirement-id="${escapeAttr(
-          requirement.id
-        )}">Remove</button>
-      </div>
+      <button class="button small ghost panel-icon-button sentence-remove" type="button" data-action="remove-requirement" data-requirement-id="${escapeAttr(
+        requirement.id
+      )}" aria-label="Remove check variable">&times;</button>
     </div>
   `;
 }
@@ -2981,11 +3132,11 @@ function renderVariableEffectEditor(game, effect, context = {}) {
   const actionOptions =
     effect.variableType === "tracker"
       ? [
-          { value: "set", label: "set" },
-          { value: "increase", label: "increase" },
-          { value: "decrease", label: "decrease" },
+          { value: "set", label: "Set to" },
+          { value: "increase", label: "Increase by" },
+          { value: "decrease", label: "Decrease by" },
         ]
-      : [{ value: "set", label: "set" }];
+      : [{ value: "set", label: "Set to" }];
   const valueControl =
     effect.variableType === "flag"
       ? renderSelectControl({
@@ -3017,64 +3168,54 @@ function renderVariableEffectEditor(game, effect, context = {}) {
             String(effect.value ?? 0)
           )}" />`;
   return `
-    <div class="item-card">
-      <div class="inline-form">
-        <div class="field-group">
-          <label>Action</label>
-          ${renderSelectControl({
-            menuId: `effect:${effect.id}:action`,
-            value: effect.action,
-            attributes: {
-              "data-variable-effect-id": effect.id,
-              "data-variable-effect-field": "action",
-              ...(context.extraData || {}),
-            },
-            options: actionOptions,
-          })}
-        </div>
-        <div class="field-group">
-          <label>Variable Type</label>
-          ${renderSelectControl({
-            menuId: `effect:${effect.id}:variableType`,
-            value: effect.variableType,
-            attributes: {
-              "data-variable-effect-id": effect.id,
-              "data-variable-effect-field": "variableType",
-              ...(context.extraData || {}),
-            },
-            options: [
-              { value: "tracker", label: "Integer" },
-              { value: "flag", label: "Enum" },
-              { value: "profile", label: "Profile" },
-              { value: "string", label: "String" },
-            ],
-          })}
-        </div>
+    <div class="sentence-row sentence-row-set">
+      <div class="sentence-cell">
+        ${renderSelectControl({
+          menuId: `effect:${effect.id}:action`,
+          value: effect.action,
+          attributes: {
+            "data-variable-effect-id": effect.id,
+            "data-variable-effect-field": "action",
+            ...(context.extraData || {}),
+          },
+          options: actionOptions,
+        })}
       </div>
-      <div class="inline-form">
-        <div class="field-group">
-          <label>Variable</label>
-          ${renderSelectControl({
-            menuId: `effect:${effect.id}:variableId`,
-            value: effect.variableId || "",
-            attributes: {
-              "data-variable-effect-id": effect.id,
-              "data-variable-effect-field": "variableId",
-              ...(context.extraData || {}),
-            },
-            options: getVariableOptions(game, effect.variableType),
-          })}
-        </div>
-        <div class="field-group">
-          <label>Value</label>
+      <div class="sentence-cell">
+        ${renderSelectControl({
+          menuId: `effect:${effect.id}:variableType`,
+          value: effect.variableType,
+          attributes: {
+            "data-variable-effect-id": effect.id,
+            "data-variable-effect-field": "variableType",
+            ...(context.extraData || {}),
+          },
+          options: [
+            { value: "tracker", label: "Integer" },
+            { value: "flag", label: "Enum" },
+            { value: "profile", label: "Profile" },
+            { value: "string", label: "String" },
+          ],
+        })}
+      </div>
+      <div class="sentence-cell">
+        ${renderSelectControl({
+          menuId: `effect:${effect.id}:variableId`,
+          value: effect.variableId || "",
+          attributes: {
+            "data-variable-effect-id": effect.id,
+            "data-variable-effect-field": "variableId",
+            ...(context.extraData || {}),
+          },
+          options: getVariableOptions(game, effect.variableType),
+        })}
+      </div>
+      <div class="sentence-cell">
           ${valueControl}
-        </div>
       </div>
-      <div class="item-actions">
-        <button class="button small ghost" type="button" data-action="${escapeAttr(removeAction)}" data-variable-effect-id="${escapeAttr(
+      <button class="button small ghost panel-icon-button sentence-remove" type="button" data-action="${escapeAttr(removeAction)}" data-variable-effect-id="${escapeAttr(
           effect.id
-        )}" ${extraData}>Remove</button>
-      </div>
+        )}" ${extraData} aria-label="Remove set variable">&times;</button>
     </div>
   `;
 }
@@ -3366,14 +3507,6 @@ function renderNodeOptionRow(game, node, option) {
   const selectedOption = appState.selection.nodeId === node.id && appState.selection.optionId === option.id;
   const draggingOption =
     appState.drag?.type === "reorderOption" && appState.drag.nodeId === node.id && appState.drag.itemId === option.id;
-  const cluster = option.targetClusterId ? getClusterById(game, option.targetClusterId) : null;
-  const targetNodeId = resolveOptionTargetNodeId(game, option);
-  const targetLabel =
-    option.terminal === "target"
-      ? cluster
-        ? `${cluster.name || "Cluster"} -> ${getNodeById(game, targetNodeId)?.name || "Unassigned"}`
-        : getNodeById(game, targetNodeId)?.name || "Drag to connect"
-      : formatTerminalLabel(option.terminal);
 
   return `
     <div class="node-option ${selectedOption ? "selected" : ""} ${draggingOption ? "is-dragging" : ""}" data-node-id="${escapeAttr(node.id)}" data-option-id="${escapeAttr(
@@ -3381,12 +3514,11 @@ function renderNodeOptionRow(game, node, option) {
     )}">
       <div class="node-block-head">
         <div class="node-rule-icons">
-          ${renderRequirementIcons(option.requirements, "option", option.failureMode)}
+          ${renderRequirementIcons(option.requirements, "option", option.failureMode, option.variableEffects)}
         </div>
       </div>
       <div class="node-option-meta">
         <div class="node-option-text node-text-static">${escapeHtml(option.text)}</div>
-        <small>${escapeHtml(targetLabel)}</small>
       </div>
       <div class="node-option-actions">
         <button class="option-handle" type="button" data-connect-option-id="${escapeAttr(
@@ -3454,18 +3586,14 @@ function renderOptionFloatingMenu(game, node, option, positionStyle) {
   `;
 }
 
-function renderRequirementIcons(requirements, kind, failureMode = "disabled") {
+function renderRequirementIcons(requirements, kind, failureMode = "disabled", variableEffects = []) {
   const hasRequirements = requirements.length > 0;
-  const hasTracker = requirements.some((requirement) => requirement.kind === "tracker");
-  const hasFlag = requirements.some((requirement) => requirement.kind === "flag");
-  const hasProfile = requirements.some((requirement) => requirement.kind === "profile");
   const parts = [
-    renderRuleIcon("tracker", hasTracker),
-    renderRuleIcon("flag", hasFlag),
-    renderRuleIcon("profile", hasProfile),
+    renderRuleIcon("checks", hasRequirements),
   ];
 
   if (kind === "option") {
+    parts.push(renderRuleIcon("effects", variableEffects.length > 0));
     parts.push(renderRuleIcon("hidden", hasRequirements && failureMode === "hidden"));
     parts.push(renderRuleIcon("disabled", hasRequirements && failureMode === "disabled"));
   }
@@ -3475,9 +3603,8 @@ function renderRequirementIcons(requirements, kind, failureMode = "disabled") {
 
 function renderRuleIcon(kind, active) {
   const labels = {
-    tracker: "Checks integer",
-    flag: "Checks enum",
-    profile: "Checks profile",
+    checks: "Checks variables",
+    effects: "Sets variables",
     hidden: "Hidden when unmet",
     disabled: "Disabled when unmet",
   };
@@ -3490,12 +3617,10 @@ function renderRuleIcon(kind, active) {
 
 function renderRuleIconSvg(kind) {
   switch (kind) {
-    case "tracker":
-      return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12V8M8 12V4M13 12V6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.4"/></svg>';
-    case "flag":
-      return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 13V3M4 3h6l-1.5 2L10 7H4" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.4"/></svg>';
-    case "profile":
-      return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 5.5h5v5h-5zM7.5 3.5h5v5h-5z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.2"/></svg>';
+    case "checks":
+      return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5h7M3 8h5M3 11.5h4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.4"/><path d="M10.2 10.1 11.5 11.4 14 8.9" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.4"/></svg>';
+    case "effects":
+      return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.4"/><path d="M4 13h8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.2" opacity="0.7"/></svg>';
     case "hidden":
       return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.4 8c1.3-2.1 3.2-3.1 5.6-3.1 2.4 0 4.3 1 5.6 3.1-1.3 2.1-3.2 3.1-5.6 3.1-2.4 0-4.3-1-5.6-3.1Zm0 0 11.2 0M5 11l6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2"/></svg>';
     case "disabled":
@@ -4333,6 +4458,10 @@ function closeTransientCreateMenus() {
 }
 
 function handleDocumentMouseDown(event) {
+  if (appState.view === "create" && dismissOpenSelectMenuIfNeeded(event.target)) {
+    return;
+  }
+
   if (
     appState.view === "create" &&
     !event.target.closest(
@@ -4350,18 +4479,76 @@ function handleDocumentMouseDown(event) {
   }
 }
 
+function findOpenSelectMenuElement() {
+  if (!appState.selection.selectMenuId) {
+    return null;
+  }
+
+  return [...document.querySelectorAll(".select-menu[data-select-menu-id]")].find(
+    (element) => element.dataset.selectMenuId === appState.selection.selectMenuId
+  ) || null;
+}
+
+function dismissOpenSelectMenuIfNeeded(target) {
+  const menuElement = findOpenSelectMenuElement();
+  if (!menuElement) {
+    appState.selection.selectMenuId = null;
+    return false;
+  }
+
+  if (menuElement.contains(target) || refs.menuOverlay.contains(target)) {
+    return false;
+  }
+
+  appState.selection.selectMenuId = null;
+  renderMenuOverlay();
+  return false;
+}
+
+function renderMenuOverlay() {
+  if (appState.view !== "create") {
+    refs.menuOverlay.innerHTML = "";
+    return;
+  }
+
+  const menuElement = findOpenSelectMenuElement();
+  if (!menuElement) {
+    refs.menuOverlay.innerHTML = "";
+    return;
+  }
+
+  const button = menuElement.querySelector(".select-menu-button");
+  const content = menuElement.querySelector(".select-menu-options .popover-menu");
+  if (!button || !content) {
+    refs.menuOverlay.innerHTML = "";
+    return;
+  }
+
+  const rect = button.getBoundingClientRect();
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const estimatedWidth = Math.min(360, viewportWidth - 24);
+  const estimatedHeight = 260;
+  const left = Math.min(rect.left, viewportWidth - estimatedWidth - 12);
+  const top = rect.bottom + 6 + estimatedHeight > viewportHeight ? Math.max(12, rect.top - estimatedHeight - 6) : rect.bottom + 6;
+
+  refs.menuOverlay.innerHTML = `
+    <div class="menu-overlay-popover" style="left:${Math.max(12, left)}px; top:${top}px; min-width:${Math.ceil(rect.width)}px;">
+      ${content.outerHTML}
+    </div>
+  `;
+}
+
 function handleSelectMenuAction(actionElement) {
   const action = actionElement?.dataset.action;
   if (action === "toggle-select-menu") {
     appState.selection.trackerMenuId = null;
     appState.selection.nodeMenuId = null;
-    appState.selection.paragraphMenuId = null;
-    appState.selection.optionMenuId = null;
     appState.selection.selectMenuId =
       appState.selection.selectMenuId === actionElement.dataset.selectMenuId
         ? null
         : actionElement.dataset.selectMenuId;
-    renderCreateView();
+    renderMenuOverlay();
     return true;
   }
 
@@ -4369,11 +4556,11 @@ function handleSelectMenuAction(actionElement) {
     return false;
   }
 
-  const menuElement = actionElement.closest("[data-select-menu-id]");
+  const menuElement = findOpenSelectMenuElement();
   const input = menuElement?.querySelector(".select-menu-input");
   if (!input) {
     appState.selection.selectMenuId = null;
-    renderCreateView();
+    renderMenuOverlay();
     return true;
   }
 
@@ -4381,6 +4568,7 @@ function handleSelectMenuAction(actionElement) {
   const changed = input.value !== nextValue;
   input.value = nextValue;
   appState.selection.selectMenuId = null;
+  renderMenuOverlay();
 
   if (changed) {
     input.dispatchEvent(new Event("change", { bubbles: true }));
@@ -4388,6 +4576,11 @@ function handleSelectMenuAction(actionElement) {
     renderCreateView();
   }
   return true;
+}
+
+function handleOverlayClick(event) {
+  const actionElement = event.target.closest("[data-action]");
+  handleSelectMenuAction(actionElement);
 }
 
 function handleGraphClick(event) {
