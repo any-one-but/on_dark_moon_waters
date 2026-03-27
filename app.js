@@ -4675,6 +4675,24 @@ function handleInspectorChange(event) {
   const target = event.target;
 
   if (target.dataset.nodeField) {
+    if (target.dataset.nodeId) {
+      const node = getNodeById(appState.createGame, target.dataset.nodeId);
+      if (!node) {
+        return;
+      }
+
+      if (target.dataset.nodeField === "id") {
+        if (!renameNodeId(appState.createGame, node.id, target.value)) {
+          renderCreateView();
+          return;
+        }
+      } else {
+        node[target.dataset.nodeField] = target.type === "checkbox" ? target.checked : target.value;
+      }
+      commitEditorChange();
+      return;
+    }
+
     withSelectedNode((node) => {
       if (target.dataset.nodeField === "id") {
         renameNodeId(appState.createGame, node.id, target.value);
@@ -4682,6 +4700,18 @@ function handleInspectorChange(event) {
       }
       node[target.dataset.nodeField] = target.type === "checkbox" ? target.checked : target.value;
     });
+    commitEditorChange();
+    return;
+  }
+
+  if (target.dataset.paragraphField && target.dataset.nodeId && target.dataset.paragraphId) {
+    const node = getNodeById(appState.createGame, target.dataset.nodeId);
+    const paragraph = getParagraphById(node, target.dataset.paragraphId);
+    if (!paragraph) {
+      return;
+    }
+
+    paragraph[target.dataset.paragraphField] = target.value;
     commitEditorChange();
     return;
   }
@@ -4707,6 +4737,22 @@ function handleInspectorChange(event) {
   }
 
   if (target.dataset.optionField) {
+    if (target.dataset.nodeId && target.dataset.optionId) {
+      const node = getNodeById(appState.createGame, target.dataset.nodeId);
+      const option = getOptionById(node, target.dataset.optionId);
+      if (!option) {
+        return;
+      }
+
+      option[target.dataset.optionField] =
+        target.dataset.optionField === "targetNodeId" ? target.value || null : target.value;
+      if (target.dataset.optionField === "targetNodeId") {
+        option.targetClusterId = null;
+      }
+      commitEditorChange();
+      return;
+    }
+
     withSelectedOption((option) => {
       option[target.dataset.optionField] =
         target.dataset.optionField === "targetNodeId" ? target.value || null : target.value;
